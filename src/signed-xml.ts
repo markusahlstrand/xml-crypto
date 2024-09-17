@@ -384,7 +384,10 @@ export class SignedXml {
     }
   }
 
-  validateElementAgainstReferences(elemOrXpath: Element | string, doc: Document): Reference {
+  async validateElementAgainstReferences(
+    elemOrXpath: Element | string,
+    doc: Document,
+  ): Promise<Reference> {
     let elem: Element;
     if (typeof elemOrXpath === "string") {
       const firstElem = xpath.select1(elemOrXpath, doc);
@@ -407,7 +410,7 @@ export class SignedXml {
 
       const canonXml = this.getCanonReferenceXml(doc, ref, elem);
       const hash = this.findHashAlgorithm(ref.digestAlgorithm);
-      const digest = hash.getHash(canonXml);
+      const digest = await hash.getHash(canonXml);
 
       if (utils.validateDigestValue(digest, ref.digestValue)) {
         return ref;
@@ -417,7 +420,7 @@ export class SignedXml {
     throw new Error("No references passed validation");
   }
 
-  private validateReference(ref: Reference, doc: Document) {
+  private async validateReference(ref: Reference, doc: Document) {
     const uri = ref.uri?.[0] === "#" ? ref.uri.substring(1) : ref.uri;
     let elem: xpath.SelectSingleReturnType = null;
 
@@ -467,7 +470,7 @@ export class SignedXml {
 
     const canonXml = this.getCanonReferenceXml(doc, ref, elem);
     const hash = this.findHashAlgorithm(ref.digestAlgorithm);
-    const digest = hash.getHash(canonXml);
+    const digest = await hash.getHash(canonXml);
 
     if (!utils.validateDigestValue(digest, ref.digestValue)) {
       const validationError = new Error(
@@ -733,7 +736,7 @@ export class SignedXml {
     callback: ErrorFirstCallback<SignedXml>,
   ): Promise<void>;
 
-  computeSignature(
+  async computeSignature(
     xml: string,
     options?: ComputeSignatureOptions | ErrorFirstCallback<SignedXml>,
     callbackParam?: ErrorFirstCallback<SignedXml>,
@@ -780,7 +783,7 @@ export class SignedXml {
         throw err;
       } else {
         callback(err);
-        return Promise.resolve();
+        return;
       }
     }
 
@@ -803,7 +806,7 @@ export class SignedXml {
 
     let signatureXml = `<${currentPrefix}Signature ${signatureAttrs.join(" ")}>`;
 
-    signatureXml += this.createSignedInfo(doc, prefix);
+    signatureXml += await this.createSignedInfo(doc, prefix);
     signatureXml += this.getKeyInfo(prefix);
     signatureXml += `</${currentPrefix}Signature>`;
 
@@ -833,7 +836,7 @@ export class SignedXml {
         throw err2;
       } else {
         callback(err2);
-        return Promise.resolve();
+        return;
       }
     }
 
@@ -865,7 +868,7 @@ export class SignedXml {
         throw err3;
       } else {
         callback(err3);
-        return Promise.resolve();
+        return;
       }
     }
     const signedInfoNode = signedInfoNodes[0];
@@ -890,7 +893,6 @@ export class SignedXml {
       this.signatureXml = signatureDoc.toString();
       this.signedXml = doc.toString();
     }
-    return Promise.resolve();
   }
 
   private getKeyInfo(prefix) {
@@ -915,7 +917,7 @@ export class SignedXml {
    * Generate the Reference nodes (as part of the signature process)
    *
    */
-  private createReferences(doc, prefix) {
+  private async createReferences(doc, prefix) {
     let res = "";
 
     prefix = prefix || "";
@@ -959,7 +961,9 @@ export class SignedXml {
         res +=
           `</${prefix}Transforms>` +
           `<${prefix}DigestMethod Algorithm="${digestAlgorithm.getAlgorithmName()}" />` +
-          `<${prefix}DigestValue>${digestAlgorithm.getHash(canonXml)}</${prefix}DigestValue>` +
+          `<${prefix}DigestValue>${await digestAlgorithm.getHash(
+            canonXml,
+          )}</${prefix}DigestValue>` +
           `</${prefix}Reference>`;
       }
     }
@@ -1045,7 +1049,7 @@ export class SignedXml {
    * Create the SignedInfo element
    *
    */
-  private createSignedInfo(doc, prefix) {
+  private async createSignedInfo(doc, prefix) {
     if (typeof this.canonicalizationAlgorithm !== "string") {
       throw new Error(
         "Missing canonicalizationAlgorithm when trying to create signed info for XML",
@@ -1071,7 +1075,7 @@ export class SignedXml {
     }
     res += `<${currentPrefix}SignatureMethod Algorithm="${algo.getAlgorithmName()}" />`;
 
-    res += this.createReferences(doc, prefix);
+    res += await this.createReferences(doc, prefix);
     res += `</${currentPrefix}SignedInfo>`;
     return res;
   }

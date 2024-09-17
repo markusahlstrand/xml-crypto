@@ -6,7 +6,7 @@ import { expect } from "chai";
 import * as isDomNode from "@xmldom/is-dom-node";
 
 describe("Signature integration tests", function () {
-  function verifySignature(xml, expected, xpath, canonicalizationAlgorithm) {
+  async function verifySignature(xml, expected, xpath, canonicalizationAlgorithm) {
     const sig = new SignedXml();
     sig.privateKey = fs.readFileSync("./test/static/client.pem");
 
@@ -20,17 +20,17 @@ describe("Signature integration tests", function () {
 
     sig.canonicalizationAlgorithm = canonicalizationAlgorithm;
     sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
-    sig.computeSignature(xml);
+    await sig.computeSignature(xml);
     const signed = sig.getSignedXml();
 
     const expectedContent = fs.readFileSync(expected).toString();
     expect(signed, "signature xml different than expected").to.equal(expectedContent);
   }
 
-  it("verify signature", function () {
+  it("verify signature", async function () {
     const xml =
       '<root><x xmlns="ns"></x><y z_attr="value" a_attr1="foo"></y><z><ns:w ns:attr="value" xmlns:ns="myns"></ns:w></z></root>';
-    verifySignature(
+    await verifySignature(
       xml,
       "./test/static/integration/expectedVerify.xml",
       ["//*[local-name(.)='x']", "//*[local-name(.)='y']", "//*[local-name(.)='w']"],
@@ -38,7 +38,7 @@ describe("Signature integration tests", function () {
     );
   });
 
-  it("verify signature of complex element", function () {
+  it("verify signature of complex element", async function () {
     const xml =
       "<library>" +
       "<book>" +
@@ -50,7 +50,7 @@ describe("Signature integration tests", function () {
       "</book>" +
       "</library>";
 
-    verifySignature(
+    await verifySignature(
       xml,
       "./test/static/integration/expectedVerifyComplex.xml",
       ["//*[local-name(.)='book']"],
@@ -172,7 +172,7 @@ describe("Signature integration tests", function () {
     expect(result).to.be.true;
   });
 
-  it("should create single root xml document when signing inner node", function () {
+  it("should create single root xml document when signing inner node", async function () {
     const xml = "<library>" + "<book>" + "<name>Harry Potter</name>" + "</book>" + "</library>";
 
     const sig = new SignedXml();
@@ -184,7 +184,7 @@ describe("Signature integration tests", function () {
     sig.privateKey = fs.readFileSync("./test/static/client.pem");
     sig.canonicalizationAlgorithm = "http://www.w3.org/2001/10/xml-exc-c14n#";
     sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
-    sig.computeSignature(xml);
+    await sig.computeSignature(xml);
 
     const signed = sig.getSignedXml();
 

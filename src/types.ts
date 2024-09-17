@@ -149,7 +149,7 @@ export interface CanonicalizationOrTransformationAlgorithm {
 export interface HashAlgorithm {
   getAlgorithmName(): HashAlgorithmType;
 
-  getHash(xml: string): string;
+  getHash(xml: string): Promise<string>;
 }
 
 /** Extend this to create a new SignatureAlgorithm */

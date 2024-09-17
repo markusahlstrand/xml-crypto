@@ -59,7 +59,7 @@ describe("HMAC tests", function () {
       transforms: ["http://www.w3.org/2001/10/xml-exc-c14n#"],
     });
     sig.canonicalizationAlgorithm = "http://www.w3.org/2001/10/xml-exc-c14n#";
-    sig.computeSignature(xml);
+    await sig.computeSignature(xml);
 
     const doc = new xmldom.DOMParser().parseFromString(sig.getSignedXml());
     const signature = xpath.select1(

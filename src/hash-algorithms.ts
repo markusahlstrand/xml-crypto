@@ -2,7 +2,7 @@ import * as crypto from "crypto";
 import type { HashAlgorithm } from "./types";
 
 export class Sha1 implements HashAlgorithm {
-  getHash = function (xml) {
+  getHash = async function (xml) {
     const shasum = crypto.createHash("sha1");
     shasum.update(xml, "utf8");
     const res = shasum.digest("base64");
@@ -15,7 +15,7 @@ export class Sha1 implements HashAlgorithm {
 }
 
 export class Sha256 implements HashAlgorithm {
-  getHash = function (xml) {
+  getHash = async function (xml) {
     const shasum = crypto.createHash("sha256");
     shasum.update(xml, "utf8");
     const res = shasum.digest("base64");
@@ -28,7 +28,7 @@ export class Sha256 implements HashAlgorithm {
 }
 
 export class Sha512 implements HashAlgorithm {
-  getHash = function (xml) {
+  getHash = async function (xml) {
     const shasum = crypto.createHash("sha512");
     shasum.update(xml, "utf8");
     const res = shasum.digest("base64");
