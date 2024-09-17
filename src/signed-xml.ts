@@ -232,7 +232,7 @@ export class SignedXml {
    * @returns `true` if the signature is valid
    * @throws Error if no key info resolver is provided.
    */
-  checkSignature(xml: string): boolean;
+  async checkSignature(xml: string): Promise<boolean>;
   /**
    * Validates the signature of the provided XML document synchronously using the configured key info provider.
    *
@@ -240,11 +240,14 @@ export class SignedXml {
    * @param callback Callback function to handle the validation result asynchronously.
    * @throws Error if the last parameter is provided and is not a function, or if no key info resolver is provided.
    */
-  checkSignature(xml: string, callback: (error: Error | null, isValid?: boolean) => void): void;
-  checkSignature(
+  async checkSignature(
+    xml: string,
+    callback: (error: Error | null, isValid?: boolean) => void,
+  ): Promise<void>;
+  async checkSignature(
     xml: string,
     callback?: (error: Error | null, isValid?: boolean) => void,
-  ): unknown {
+  ): Promise<unknown> {
     if (callback != null && typeof callback !== "function") {
       throw new Error("Last parameter must be a callback function");
     }

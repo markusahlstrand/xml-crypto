@@ -780,7 +780,7 @@ describe("Signature unit tests", function () {
 
   describe("verify existing signature", function () {
     describe("pass loading signatures", function () {
-      function passLoadSignature(file: string, toString?: boolean) {
+      async function passLoadSignature(file: string, toString?: boolean) {
         const xml = fs.readFileSync(file, "utf8");
         const doc = new xmldom.DOMParser().parseFromString(xml);
         const signature = xpath.select1(
@@ -813,7 +813,7 @@ describe("Signature unit tests", function () {
           return fs.readFileSync("./test/static/client.pem", "latin1");
         };
 
-        const checkedSignature = sig.checkSignature(xml);
+        const checkedSignature = await sig.checkSignature(xml);
         expect(checkedSignature).to.be.true;
 
         expect(sig.getReferences().length).to.equal(3);
@@ -843,21 +843,21 @@ describe("Signature unit tests", function () {
         }
       }
 
-      it("correctly loads signature", function () {
-        passLoadSignature("./test/static/valid_signature.xml");
+      it("correctly loads signature", async function () {
+        await passLoadSignature("./test/static/valid_signature.xml");
       });
 
-      it("correctly loads signature with validation", function () {
-        passLoadSignature("./test/static/valid_signature.xml", true);
+      it("correctly loads signature with validation", async function () {
+        await passLoadSignature("./test/static/valid_signature.xml", true);
       });
 
-      it("correctly loads signature with root level sig namespace", function () {
-        passLoadSignature("./test/static/valid_signature_with_root_level_sig_namespace.xml");
+      it("correctly loads signature with root level sig namespace", async function () {
+        await passLoadSignature("./test/static/valid_signature_with_root_level_sig_namespace.xml");
       });
     });
 
     describe("pass verify signature", function () {
-      function verifySignature(xml: string, idMode?: "wssecurity") {
+      async function verifySignature(xml: string, idMode?: "wssecurity") {
         const doc = new xmldom.DOMParser().parseFromString(xml);
         const node = xpath.select1(
           "//*[local-name(.)='Signature' and namespace-uri(.)='http://www.w3.org/2000/09/xmldsig#']",
@@ -868,7 +868,7 @@ describe("Signature unit tests", function () {
         sig.publicCert = fs.readFileSync("./test/static/client_public.pem");
         sig.loadSignature(node);
         try {
-          const res = sig.checkSignature(xml);
+          const res = await sig.checkSignature(xml);
 
           return res;
         } catch (e) {
@@ -876,93 +876,100 @@ describe("Signature unit tests", function () {
         }
       }
 
-      function passValidSignature(file: string, mode?: "wssecurity") {
+      async function passValidSignature(file: string, mode?: "wssecurity") {
         const xml = fs.readFileSync(file, "utf8");
-        const res = verifySignature(xml, mode);
+        const res = await verifySignature(xml, mode);
         expect(res, "expected signature to be valid, but it was reported invalid").to.equal(true);
       }
 
-      function failInvalidSignature(file: string, idMode?: "wssecurity") {
+      async function failInvalidSignature(file: string, idMode?: "wssecurity") {
         const xml = fs.readFileSync(file).toString();
-        const res = verifySignature(xml, idMode);
+        const res = await verifySignature(xml, idMode);
         expect(res, "expected signature to be invalid, but it was reported valid").to.equal(false);
       }
 
-      it("verifies valid signature", function () {
-        passValidSignature("./test/static/valid_signature.xml");
+      it("verifies valid signature", async function () {
+        await passValidSignature("./test/static/valid_signature.xml");
       });
 
-      it("verifies valid signature with lowercase id attribute", function () {
-        passValidSignature("./test/static/valid_signature_with_lowercase_id_attribute.xml");
+      it("verifies valid signature with lowercase id attribute", async function () {
+        await passValidSignature("./test/static/valid_signature_with_lowercase_id_attribute.xml");
       });
 
-      it("verifies valid signature with wsu", function () {
-        passValidSignature("./test/static/valid_signature wsu.xml", "wssecurity");
+      it("verifies valid signature with wsu", async function () {
+        await passValidSignature("./test/static/valid_signature wsu.xml", "wssecurity");
       });
 
-      it("verifies valid signature with reference keyInfo", function () {
-        passValidSignature("./test/static/valid_signature_with_reference_keyInfo.xml");
+      it("verifies valid signature with reference keyInfo", async function () {
+        await passValidSignature("./test/static/valid_signature_with_reference_keyInfo.xml");
       });
 
-      it("verifies valid signature with whitespace in digestvalue", function () {
-        passValidSignature("./test/static/valid_signature_with_whitespace_in_digestvalue.xml");
+      it("verifies valid signature with whitespace in digestvalue", async function () {
+        await passValidSignature(
+          "./test/static/valid_signature_with_whitespace_in_digestvalue.xml",
+        );
       });
 
-      it("verifies valid utf8 signature", function () {
-        passValidSignature("./test/static/valid_signature_utf8.xml");
+      it("verifies valid utf8 signature", async function () {
+        await passValidSignature("./test/static/valid_signature_utf8.xml");
       });
 
-      it("verifies valid signature with unused prefixes", function () {
-        passValidSignature("./test/static/valid_signature_with_unused_prefixes.xml");
+      it("verifies valid signature with unused prefixes", async function () {
+        await passValidSignature("./test/static/valid_signature_with_unused_prefixes.xml");
       });
 
-      it("verifies valid signature without transforms element", function () {
-        passValidSignature("./test/static/valid_signature_without_transforms_element.xml");
+      it("verifies valid signature without transforms element", async function () {
+        await passValidSignature("./test/static/valid_signature_without_transforms_element.xml");
       });
 
-      it("fails invalid signature - signature value", function () {
-        failInvalidSignature("./test/static/invalid_signature - signature value.xml");
+      it("fails invalid signature - signature value", async function () {
+        await failInvalidSignature("./test/static/invalid_signature - signature value.xml");
       });
 
-      it("fails invalid signature - hash", function () {
-        failInvalidSignature("./test/static/invalid_signature - hash.xml");
+      it("fails invalid signature - hash", async function () {
+        await failInvalidSignature("./test/static/invalid_signature - hash.xml");
       });
 
-      it("fails invalid signature - non existing reference", function () {
-        failInvalidSignature("./test/static/invalid_signature - non existing reference.xml");
+      it("fails invalid signature - non existing reference", async function () {
+        await failInvalidSignature("./test/static/invalid_signature - non existing reference.xml");
       });
 
-      it("fails invalid signature - changed content", function () {
-        failInvalidSignature("./test/static/invalid_signature - changed content.xml");
+      it("fails invalid signature - changed content", async function () {
+        await failInvalidSignature("./test/static/invalid_signature - changed content.xml");
       });
 
-      it("fails invalid signature - wsu - invalid signature value", function () {
-        failInvalidSignature(
+      it("fails invalid signature - wsu - invalid signature value", async function () {
+        await failInvalidSignature(
           "./test/static/invalid_signature - wsu - invalid signature value.xml",
           "wssecurity",
         );
       });
 
-      it("fails invalid signature - wsu - hash", function () {
-        failInvalidSignature("./test/static/invalid_signature - wsu - hash.xml", "wssecurity");
+      it("fails invalid signature - wsu - hash", async function () {
+        await failInvalidSignature(
+          "./test/static/invalid_signature - wsu - hash.xml",
+          "wssecurity",
+        );
       });
 
-      it("fails invalid signature - wsu - non existing reference", function () {
-        failInvalidSignature(
+      it("fails invalid signature - wsu - non existing reference", async function () {
+        await failInvalidSignature(
           "./test/static/invalid_signature - wsu - non existing reference.xml",
           "wssecurity",
         );
       });
 
-      it("fails invalid signature - wsu - changed content", function () {
-        failInvalidSignature(
+      it("fails invalid signature - wsu - changed content", async function () {
+        await failInvalidSignature(
           "./test/static/invalid_signature - wsu - changed content.xml",
           "wssecurity",
         );
       });
 
-      it("fails invalid signature without transforms element", function () {
-        failInvalidSignature("./test/static/invalid_signature_without_transforms_element.xml");
+      it("fails invalid signature without transforms element", async function () {
+        await failInvalidSignature(
+          "./test/static/invalid_signature_without_transforms_element.xml",
+        );
       });
     });
   });

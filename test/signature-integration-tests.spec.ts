@@ -58,7 +58,7 @@ describe("Signature integration tests", function () {
     );
   });
 
-  it("empty URI reference should consider the whole document", function () {
+  it("empty URI reference should consider the whole document", async function () {
     const xml = "<library>" + "<book>" + "<name>Harry Potter</name>" + "</book>" + "</library>";
 
     const signature =
@@ -80,12 +80,12 @@ describe("Signature integration tests", function () {
     const sig = new SignedXml();
     sig.publicCert = fs.readFileSync("./test/static/client_public.pem");
     sig.loadSignature(signature);
-    const result = sig.checkSignature(xml);
+    const result = await sig.checkSignature(xml);
 
     expect(result).to.be.true;
   });
 
-  it("add canonicalization if output of transforms will be a node-set rather than an octet stream", function () {
+  it("add canonicalization if output of transforms will be a node-set rather than an octet stream", async function () {
     let xml = fs.readFileSync("./test/static/windows_store_signature.xml", "utf-8");
 
     /** Make sure that whitespace in the source document is removed --
@@ -107,12 +107,12 @@ describe("Signature integration tests", function () {
     const sig = new SignedXml();
     sig.publicCert = fs.readFileSync("./test/static/windows_store_certificate.pem");
     sig.loadSignature(signature);
-    const result = sig.checkSignature(childXml ?? "");
+    const result = await sig.checkSignature(childXml ?? "");
 
     expect(result).to.be.true;
   });
 
-  it("signature with inclusive namespaces", function () {
+  it("signature with inclusive namespaces", async function () {
     const xml = fs.readFileSync("./test/static/signature_with_inclusivenamespaces.xml", "utf-8");
     const doc = new xmldom.DOMParser().parseFromString(xml);
     const childXml = doc.firstChild?.toString();
@@ -125,12 +125,12 @@ describe("Signature integration tests", function () {
     const sig = new SignedXml();
     sig.publicCert = fs.readFileSync("./test/static/signature_with_inclusivenamespaces.pem");
     sig.loadSignature(signature);
-    const result = sig.checkSignature(childXml ?? "");
+    const result = await sig.checkSignature(childXml ?? "");
 
     expect(result).to.be.true;
   });
 
-  it("signature with inclusive namespaces with unix line separators", function () {
+  it("signature with inclusive namespaces with unix line separators", async function () {
     const xml = fs.readFileSync(
       "./test/static/signature_with_inclusivenamespaces_lines.xml",
       "utf-8",
@@ -146,12 +146,12 @@ describe("Signature integration tests", function () {
     const sig = new SignedXml();
     sig.publicCert = fs.readFileSync("./test/static/signature_with_inclusivenamespaces.pem");
     sig.loadSignature(signature);
-    const result = sig.checkSignature(childXml ?? "");
+    const result = await sig.checkSignature(childXml ?? "");
 
     expect(result).to.be.true;
   });
 
-  it("signature with inclusive namespaces with windows line separators", function () {
+  it("signature with inclusive namespaces with windows line separators", async function () {
     const xml = fs.readFileSync(
       "./test/static/signature_with_inclusivenamespaces_lines_windows.xml",
       "utf-8",
@@ -167,7 +167,7 @@ describe("Signature integration tests", function () {
     const sig = new SignedXml();
     sig.publicCert = fs.readFileSync("./test/static/signature_with_inclusivenamespaces.pem");
     sig.loadSignature(signature);
-    const result = sig.checkSignature(childXml ?? "");
+    const result = await sig.checkSignature(childXml ?? "");
 
     expect(result).to.be.true;
   });

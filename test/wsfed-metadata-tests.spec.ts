@@ -6,7 +6,7 @@ import { expect } from "chai";
 import * as isDomNode from "@xmldom/is-dom-node";
 
 describe("WS-Fed Metadata tests", function () {
-  it("test validating WS-Fed Metadata", function () {
+  it("test validating WS-Fed Metadata", async function () {
     const xml = fs.readFileSync("./test/static/wsfederation_metadata.xml", "utf-8");
     const doc = new xmldom.DOMParser().parseFromString(xml);
     const signature = xpath.select1(
@@ -17,7 +17,7 @@ describe("WS-Fed Metadata tests", function () {
     const sig = new SignedXml();
     sig.publicCert = fs.readFileSync("./test/static/wsfederation_metadata.pem");
     sig.loadSignature(signature);
-    const result = sig.checkSignature(xml);
+    const result = await sig.checkSignature(xml);
 
     expect(result).to.be.true;
   });
