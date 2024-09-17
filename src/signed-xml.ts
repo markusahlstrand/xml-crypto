@@ -696,7 +696,7 @@ export class SignedXml {
    * @returns void
    * @throws TypeError If the xml can not be parsed.
    */
-  computeSignature(xml: string): void;
+  computeSignature(xml: string): Promise<void>;
 
   /**
    * Compute the signature of the given XML (using the already defined settings).
@@ -706,7 +706,7 @@ export class SignedXml {
    * @returns void
    * @throws TypeError If the xml can not be parsed.
    */
-  computeSignature(xml: string, callback: ErrorFirstCallback<SignedXml>): void;
+  computeSignature(xml: string, callback: ErrorFirstCallback<SignedXml>): Promise<void>;
 
   /**
    * Compute the signature of the given XML (using the already defined settings).
@@ -716,7 +716,7 @@ export class SignedXml {
    * @returns If no callback is provided, returns `this` (the instance of SignedXml).
    * @throws TypeError If the xml can not be parsed, or Error if there were invalid options passed.
    */
-  computeSignature(xml: string, options: ComputeSignatureOptions): void;
+  computeSignature(xml: string, options: ComputeSignatureOptions): Promise<void>;
 
   /**
    * Compute the signature of the given XML (using the already defined settings).
@@ -731,13 +731,13 @@ export class SignedXml {
     xml: string,
     options: ComputeSignatureOptions,
     callback: ErrorFirstCallback<SignedXml>,
-  ): void;
+  ): Promise<void>;
 
   computeSignature(
     xml: string,
     options?: ComputeSignatureOptions | ErrorFirstCallback<SignedXml>,
     callbackParam?: ErrorFirstCallback<SignedXml>,
-  ): void {
+  ): Promise<void> {
     let callback: ErrorFirstCallback<SignedXml>;
     if (typeof options === "function" && callbackParam == null) {
       callback = options as ErrorFirstCallback<SignedXml>;
@@ -780,7 +780,7 @@ export class SignedXml {
         throw err;
       } else {
         callback(err);
-        return;
+        return Promise.resolve();
       }
     }
 
@@ -833,7 +833,7 @@ export class SignedXml {
         throw err2;
       } else {
         callback(err2);
-        return;
+        return Promise.resolve();
       }
     }
 
@@ -865,7 +865,7 @@ export class SignedXml {
         throw err3;
       } else {
         callback(err3);
-        return;
+        return Promise.resolve();
       }
     }
     const signedInfoNode = signedInfoNodes[0];
@@ -890,6 +890,7 @@ export class SignedXml {
       this.signatureXml = signatureDoc.toString();
       this.signedXml = doc.toString();
     }
+    return Promise.resolve();
   }
 
   private getKeyInfo(prefix) {
