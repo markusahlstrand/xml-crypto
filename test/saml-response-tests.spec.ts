@@ -15,7 +15,7 @@ describe("SAML response tests", function () {
     );
     isDomNode.assertIsNodeLike(signature);
     const sig = new SignedXml();
-    sig.publicCert = fs.readFileSync("./test/static/feide_public.pem");
+    sig.publicCert = fs.readFileSync("./test/static/feide_public.pem", "binary");
     sig.loadSignature(signature);
     const result = sig.checkSignature(xml);
 
@@ -33,7 +33,7 @@ describe("SAML response tests", function () {
     );
     isDomNode.assertIsNodeLike(signature);
     const sig = new SignedXml();
-    sig.publicCert = fs.readFileSync("./test/static/feide_public.pem");
+    sig.publicCert = fs.readFileSync("./test/static/feide_public.pem", "binary");
     sig.loadSignature(signature);
     expect(
       function () {
@@ -54,7 +54,7 @@ describe("SAML response tests", function () {
     );
     isDomNode.assertIsNodeLike(signature);
     const sig = new SignedXml();
-    sig.publicCert = fs.readFileSync("./test/static/saml_external_ns.pem");
+    sig.publicCert = fs.readFileSync("./test/static/saml_external_ns.pem", "binary");
     sig.loadSignature(signature);
     const result = sig.checkSignature(xml);
     expect(result).to.be.true;
@@ -71,7 +71,7 @@ describe("SAML response tests", function () {
     );
     isDomNode.assertIsNodeLike(signature);
     const sig = new SignedXml();
-    sig.publicCert = fs.readFileSync("./test/static/feide_public.pem");
+    sig.publicCert = fs.readFileSync("./test/static/feide_public.pem", "binary");
     sig.loadSignature(signature);
     expect(function () {
       sig.checkSignature(xml);
@@ -87,7 +87,7 @@ describe("SAML response tests", function () {
     );
     isDomNode.assertIsNodeLike(signature);
     const sig = new SignedXml();
-    sig.publicCert = fs.readFileSync("./test/static/feide_public.pem");
+    sig.publicCert = fs.readFileSync("./test/static/feide_public.pem", "binary");
     sig.loadSignature(signature);
     // This doesn't matter, just want to make sure that we don't fail due to unknown algorithm
     expect(() => sig.checkSignature(xml)).to.throw(/^invalid signature/);

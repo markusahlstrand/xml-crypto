@@ -8,7 +8,7 @@ import * as isDomNode from "@xmldom/is-dom-node";
 describe("Signature integration tests", function () {
   function verifySignature(xml, expected, xpath, canonicalizationAlgorithm) {
     const sig = new SignedXml();
-    sig.privateKey = fs.readFileSync("./test/static/client.pem");
+    sig.privateKey = fs.readFileSync("./test/static/client.pem", "binary");
 
     xpath.map(function (n) {
       sig.addReference({
@@ -78,7 +78,7 @@ describe("Signature integration tests", function () {
       "</Signature>";
 
     const sig = new SignedXml();
-    sig.publicCert = fs.readFileSync("./test/static/client_public.pem");
+    sig.publicCert = fs.readFileSync("./test/static/client_public.pem", "binary");
     sig.loadSignature(signature);
     const result = sig.checkSignature(xml);
 
@@ -105,7 +105,9 @@ describe("Signature integration tests", function () {
     );
     isDomNode.assertIsNodeLike(signature);
     const sig = new SignedXml();
-    sig.publicCert = fs.readFileSync("./test/static/windows_store_certificate.pem");
+    sig.publicCert = fs
+      .readFileSync("./test/static/windows_store_certificate.pem")
+      .toString("binary");
     sig.loadSignature(signature);
     const result = sig.checkSignature(childXml ?? "");
 
@@ -123,7 +125,9 @@ describe("Signature integration tests", function () {
     );
     isDomNode.assertIsNodeLike(signature);
     const sig = new SignedXml();
-    sig.publicCert = fs.readFileSync("./test/static/signature_with_inclusivenamespaces.pem");
+    sig.publicCert = fs
+      .readFileSync("./test/static/signature_with_inclusivenamespaces.pem")
+      .toString("binary");
     sig.loadSignature(signature);
     const result = sig.checkSignature(childXml ?? "");
 
@@ -144,7 +148,9 @@ describe("Signature integration tests", function () {
     );
     isDomNode.assertIsNodeLike(signature);
     const sig = new SignedXml();
-    sig.publicCert = fs.readFileSync("./test/static/signature_with_inclusivenamespaces.pem");
+    sig.publicCert = fs
+      .readFileSync("./test/static/signature_with_inclusivenamespaces.pem")
+      .toString("binary");
     sig.loadSignature(signature);
     const result = sig.checkSignature(childXml ?? "");
 
@@ -165,7 +171,9 @@ describe("Signature integration tests", function () {
     );
     isDomNode.assertIsNodeLike(signature);
     const sig = new SignedXml();
-    sig.publicCert = fs.readFileSync("./test/static/signature_with_inclusivenamespaces.pem");
+    sig.publicCert = fs
+      .readFileSync("./test/static/signature_with_inclusivenamespaces.pem")
+      .toString("binary");
     sig.loadSignature(signature);
     const result = sig.checkSignature(childXml ?? "");
 
@@ -181,7 +189,7 @@ describe("Signature integration tests", function () {
       digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
       transforms: ["http://www.w3.org/2001/10/xml-exc-c14n#"],
     });
-    sig.privateKey = fs.readFileSync("./test/static/client.pem");
+    sig.privateKey = fs.readFileSync("./test/static/client.pem", "binary");
     sig.canonicalizationAlgorithm = "http://www.w3.org/2001/10/xml-exc-c14n#";
     sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
     sig.computeSignature(xml);

@@ -15,7 +15,7 @@ describe("WS-Fed Metadata tests", function () {
     );
     isDomNode.assertIsNodeLike(signature);
     const sig = new SignedXml();
-    sig.publicCert = fs.readFileSync("./test/static/wsfederation_metadata.pem");
+    sig.publicCert = fs.readFileSync("./test/static/wsfederation_metadata.pem", "binary");
     sig.loadSignature(signature);
     const result = sig.checkSignature(xml);
 

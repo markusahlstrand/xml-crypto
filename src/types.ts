@@ -6,8 +6,6 @@
 
 /// <reference types="node" />
 
-import * as crypto from "crypto";
-
 export type ErrorFirstCallback<T> = (err: Error | null, result?: T) => void;
 
 export type CanonicalizationAlgorithmType =
@@ -39,7 +37,7 @@ export type SignatureAlgorithmType =
  * @param prefix an optional namespace alias to be used for the generated XML
  */
 export interface GetKeyInfoContentArgs {
-  publicCert?: crypto.KeyLike;
+  publicCert?: string;
   prefix?: string | null;
 }
 
@@ -49,8 +47,8 @@ export interface GetKeyInfoContentArgs {
 export interface SignedXmlOptions {
   idMode?: "wssecurity";
   idAttribute?: string;
-  privateKey?: crypto.KeyLike;
-  publicCert?: crypto.KeyLike;
+  privateKey?: string;
+  publicCert?: string;
   signatureAlgorithm?: SignatureAlgorithmType;
   canonicalizationAlgorithm?: CanonicalizationAlgorithmType;
   inclusiveNamespacesPrefixList?: string | string[];
@@ -157,21 +155,17 @@ export interface SignatureAlgorithm {
   /**
    * Sign the given string using the given key
    */
-  getSignature(signedInfo: crypto.BinaryLike, privateKey: crypto.KeyLike): string;
-  getSignature(
-    signedInfo: crypto.BinaryLike,
-    privateKey: crypto.KeyLike,
-    callback?: ErrorFirstCallback<string>,
-  ): void;
+  getSignature(signedInfo: string, privateKey: string): string;
+  getSignature(signedInfo: string, privateKey: string, callback?: ErrorFirstCallback<string>): void;
   /**
    * Verify the given signature of the given string using key
    *
    * @param key a public cert, public key, or private key can be passed here
    */
-  verifySignature(material: string, key: crypto.KeyLike, signatureValue: string): boolean;
+  verifySignature(material: string, key: string, signatureValue: string): boolean;
   verifySignature(
     material: string,
-    key: crypto.KeyLike,
+    key: string,
     signatureValue: string,
     callback?: ErrorFirstCallback<boolean>,
   ): void;

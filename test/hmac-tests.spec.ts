@@ -17,7 +17,8 @@ describe("HMAC tests", function () {
 
     const sig = new SignedXml();
     sig.enableHMAC();
-    sig.publicCert = fs.readFileSync("./test/static/hmac.key");
+
+    sig.publicCert = fs.readFileSync("./test/static/hmac.key", "base64");
     sig.loadSignature(signature);
     const result = sig.checkSignature(xml);
 
@@ -35,7 +36,7 @@ describe("HMAC tests", function () {
 
     const sig = new SignedXml();
     sig.enableHMAC();
-    sig.publicCert = fs.readFileSync("./test/static/hmac-foobar.key");
+    sig.publicCert = fs.readFileSync("./test/static/hmac-foobar.key", "base64");
     sig.loadSignature(signature);
 
     expect(() => sig.checkSignature(xml)).to.throw(/^invalid signature/);
@@ -45,7 +46,7 @@ describe("HMAC tests", function () {
     const xml = "<library>" + "<book>" + "<name>Harry Potter</name>" + "</book>" + "</library>";
     const sig = new SignedXml();
     sig.enableHMAC();
-    sig.privateKey = fs.readFileSync("./test/static/hmac.key");
+    sig.privateKey = fs.readFileSync("./test/static/hmac.key", "base64");
     sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#hmac-sha1";
     sig.addReference({
       xpath: "//*[local-name(.)='book']",
@@ -64,7 +65,7 @@ describe("HMAC tests", function () {
 
     const verify = new SignedXml();
     verify.enableHMAC();
-    verify.publicCert = fs.readFileSync("./test/static/hmac.key");
+    verify.publicCert = fs.readFileSync("./test/static/hmac.key").toString("base64");
     verify.loadSignature(signature);
     const result = verify.checkSignature(sig.getSignedXml());
 

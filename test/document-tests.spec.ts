@@ -16,7 +16,7 @@ describe("Document tests", function () {
 
     isDomNode.assertIsNodeLike(node);
     const sig = new SignedXml();
-    sig.publicCert = fs.readFileSync("./test/static/feide_public.pem");
+    sig.publicCert = fs.readFileSync("./test/static/feide_public.pem", "binary");
     sig.loadSignature(node);
     const result = sig.checkSignature(xml);
 
@@ -33,7 +33,7 @@ describe("Document tests", function () {
 
     isDomNode.assertIsNodeLike(node);
     const sig = new SignedXml();
-    const feidePublicCert = fs.readFileSync("./test/static/feide_public.pem");
+    const feidePublicCert = fs.readFileSync("./test/static/feide_public.pem", "binary");
     sig.publicCert = feidePublicCert;
     sig.loadSignature(node);
     const result = sig.checkSignature(xml);

@@ -9,8 +9,8 @@ describe("KeyInfo tests", function () {
   it("adds X509Certificate element during signature", function () {
     const xml = "<root><x /></root>";
     const sig = new SignedXml();
-    sig.privateKey = fs.readFileSync("./test/static/client.pem");
-    sig.publicCert = fs.readFileSync("./test/static/client_public.pem");
+    sig.privateKey = fs.readFileSync("./test/static/client.pem", "binary");
+    sig.publicCert = fs.readFileSync("./test/static/client_public.pem", "binary");
     sig.canonicalizationAlgorithm = "http://www.w3.org/2001/10/xml-exc-c14n#";
     sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
     sig.computeSignature(xml);
@@ -25,8 +25,8 @@ describe("KeyInfo tests", function () {
   it("make sure private hmac key is not leaked due to key confusion", function () {
     const xml = "<library>" + "<book>" + "<name>Harry Potter</name>" + "</book>" + "</library>";
     const sig = new SignedXml();
-    sig.privateKey = fs.readFileSync("./test/static/hmac.key");
-    sig.publicCert = fs.readFileSync("./test/static/hmac.key");
+    sig.privateKey = fs.readFileSync("./test/static/hmac.key").toString("base64");
+    sig.publicCert = fs.readFileSync("./test/static/hmac.key").toString("base64");
     sig.signatureAlgorithm = "http://www.w3.org/2000/09/xmldsig#hmac-sha1";
     sig.enableHMAC();
     sig.addReference({

@@ -22,7 +22,6 @@ import * as execC14n from "./exclusive-canonicalization";
 import * as envelopedSignatures from "./enveloped-signature";
 import * as hashAlgorithms from "./hash-algorithms";
 import * as signatureAlgorithms from "./signature-algorithms";
-import * as crypto from "crypto";
 import * as isDomNode from "@xmldom/is-dom-node";
 
 export class SignedXml {
@@ -31,8 +30,8 @@ export class SignedXml {
   /**
    * A {@link Buffer} or pem encoded {@link String} containing your private key
    */
-  privateKey?: crypto.KeyLike;
-  publicCert?: crypto.KeyLike;
+  privateKey?: string;
+  publicCert?: string;
   /**
    * One of the supported signature algorithms.
    * @see {@link SignatureAlgorithmType}
