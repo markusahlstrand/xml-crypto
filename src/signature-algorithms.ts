@@ -92,7 +92,7 @@ export class HmacSha1 implements SignatureAlgorithm {
 
   verifySignature = createOptionalCallbackFunction(
     (material: string, key: string, signatureValue: string): boolean => {
-      const verifier = crypto.createHmac("SHA1", key);
+      const verifier = crypto.createHmac("SHA1", Buffer.from(key, "binary"));
       verifier.update(material);
       const res = verifier.digest("base64");
 

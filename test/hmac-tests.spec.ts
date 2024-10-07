@@ -18,7 +18,7 @@ describe("HMAC tests", function () {
     const sig = new SignedXml();
     sig.enableHMAC();
 
-    sig.publicCert = fs.readFileSync("./test/static/hmac.key", "base64");
+    sig.publicCert = fs.readFileSync("./test/static/hmac.key", "binary");
     sig.loadSignature(signature);
     const result = sig.checkSignature(xml);
 
@@ -65,7 +65,7 @@ describe("HMAC tests", function () {
 
     const verify = new SignedXml();
     verify.enableHMAC();
-    verify.publicCert = fs.readFileSync("./test/static/hmac.key").toString("base64");
+    verify.publicCert = fs.readFileSync("./test/static/hmac.key", "base64");
     verify.loadSignature(signature);
     const result = verify.checkSignature(sig.getSignedXml());
 
