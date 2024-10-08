@@ -1,4 +1,5 @@
 export { SignedXml } from "./signed-xml";
+export { WebCryptoSignedXml } from "./web-crypto-signed-xml";
 export { C14nCanonicalization, C14nCanonicalizationWithComments } from "./c14n-canonicalization";
 export {
   ExclusiveCanonicalization,

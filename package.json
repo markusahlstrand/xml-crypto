@@ -38,6 +38,7 @@
     "test": "nyc mocha"
   },
   "dependencies": {
+    "@peculiar/x509": "^1.12.3",
     "@xmldom/is-dom-node": "^1.0.1",
     "@xmldom/xmldom": "^0.8.10",
     "xpath": "^0.0.33"
