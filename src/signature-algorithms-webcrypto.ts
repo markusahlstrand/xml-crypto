@@ -1,4 +1,4 @@
-import type { SignatureAlgorithm } from "./types";
+import { createAsyncOptionalCallbackFunction, type SignatureAlgorithm } from "./types";
 import {
   importRsaPrivateKey,
   importRsaPublicKey,
@@ -32,32 +32,32 @@ function toArrayBuffer(data: unknown): ArrayBuffer {
  * Uses the Web Crypto API which is available in browsers and modern Node.js
  */
 export class WebCryptoRsaSha1 implements SignatureAlgorithm {
-  getSignature = async (signedInfo: unknown, privateKey: unknown): Promise<string> => {
-    const key =
-      typeof privateKey === "string"
-        ? await importRsaPrivateKey(privateKey, "SHA-1")
-        : (privateKey as CryptoKey);
+  getSignature = createAsyncOptionalCallbackFunction(
+    async (signedInfo: unknown, privateKey: unknown): Promise<string> => {
+      const key =
+        typeof privateKey === "string"
+          ? await importRsaPrivateKey(privateKey, "SHA-1")
+          : (privateKey as CryptoKey);
 
-    const data = toArrayBuffer(signedInfo);
+      const data = toArrayBuffer(signedInfo);
 
-    const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, data);
+      const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, data);
 
-    return arrayBufferToBase64(signature);
-  };
+      return arrayBufferToBase64(signature);
+    },
+  );
 
-  verifySignature = async (
-    material: string,
-    key: unknown,
-    signatureValue: string,
-  ): Promise<boolean> => {
-    const publicKey =
-      typeof key === "string" ? await importRsaPublicKey(key, "SHA-1") : (key as CryptoKey);
+  verifySignature = createAsyncOptionalCallbackFunction(
+    async (material: string, key: unknown, signatureValue: string): Promise<boolean> => {
+      const publicKey =
+        typeof key === "string" ? await importRsaPublicKey(key, "SHA-1") : (key as CryptoKey);
 
-    const data = new TextEncoder().encode(material);
-    const signature = base64ToArrayBuffer(signatureValue);
+      const data = new TextEncoder().encode(material);
+      const signature = base64ToArrayBuffer(signatureValue);
 
-    return await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, signature, data);
-  };
+      return await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, signature, data);
+    },
+  );
 
   getAlgorithmName = (): string => {
     return "http://www.w3.org/2000/09/xmldsig#rsa-sha1";
@@ -69,32 +69,32 @@ export class WebCryptoRsaSha1 implements SignatureAlgorithm {
  * Uses the Web Crypto API which is available in browsers and modern Node.js
  */
 export class WebCryptoRsaSha256 implements SignatureAlgorithm {
-  getSignature = async (signedInfo: unknown, privateKey: unknown): Promise<string> => {
-    const key =
-      typeof privateKey === "string"
-        ? await importRsaPrivateKey(privateKey, "SHA-256")
-        : (privateKey as CryptoKey);
+  getSignature = createAsyncOptionalCallbackFunction(
+    async (signedInfo: unknown, privateKey: unknown): Promise<string> => {
+      const key =
+        typeof privateKey === "string"
+          ? await importRsaPrivateKey(privateKey, "SHA-256")
+          : (privateKey as CryptoKey);
 
-    const data = toArrayBuffer(signedInfo);
+      const data = toArrayBuffer(signedInfo);
 
-    const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, data);
+      const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, data);
 
-    return arrayBufferToBase64(signature);
-  };
+      return arrayBufferToBase64(signature);
+    },
+  );
 
-  verifySignature = async (
-    material: string,
-    key: unknown,
-    signatureValue: string,
-  ): Promise<boolean> => {
-    const publicKey =
-      typeof key === "string" ? await importRsaPublicKey(key, "SHA-256") : (key as CryptoKey);
+  verifySignature = createAsyncOptionalCallbackFunction(
+    async (material: string, key: unknown, signatureValue: string): Promise<boolean> => {
+      const publicKey =
+        typeof key === "string" ? await importRsaPublicKey(key, "SHA-256") : (key as CryptoKey);
 
-    const data = new TextEncoder().encode(material);
-    const signature = base64ToArrayBuffer(signatureValue);
+      const data = new TextEncoder().encode(material);
+      const signature = base64ToArrayBuffer(signatureValue);
 
-    return await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, signature, data);
-  };
+      return await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, signature, data);
+    },
+  );
 
   getAlgorithmName = (): string => {
     return "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256";
@@ -106,32 +106,32 @@ export class WebCryptoRsaSha256 implements SignatureAlgorithm {
  * Uses the Web Crypto API which is available in browsers and modern Node.js
  */
 export class WebCryptoRsaSha512 implements SignatureAlgorithm {
-  getSignature = async (signedInfo: unknown, privateKey: unknown): Promise<string> => {
-    const key =
-      typeof privateKey === "string"
-        ? await importRsaPrivateKey(privateKey, "SHA-512")
-        : (privateKey as CryptoKey);
+  getSignature = createAsyncOptionalCallbackFunction(
+    async (signedInfo: unknown, privateKey: unknown): Promise<string> => {
+      const key =
+        typeof privateKey === "string"
+          ? await importRsaPrivateKey(privateKey, "SHA-512")
+          : (privateKey as CryptoKey);
 
-    const data = toArrayBuffer(signedInfo);
+      const data = toArrayBuffer(signedInfo);
 
-    const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, data);
+      const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, data);
 
-    return arrayBufferToBase64(signature);
-  };
+      return arrayBufferToBase64(signature);
+    },
+  );
 
-  verifySignature = async (
-    material: string,
-    key: unknown,
-    signatureValue: string,
-  ): Promise<boolean> => {
-    const publicKey =
-      typeof key === "string" ? await importRsaPublicKey(key, "SHA-512") : (key as CryptoKey);
+  verifySignature = createAsyncOptionalCallbackFunction(
+    async (material: string, key: unknown, signatureValue: string): Promise<boolean> => {
+      const publicKey =
+        typeof key === "string" ? await importRsaPublicKey(key, "SHA-512") : (key as CryptoKey);
 
-    const data = new TextEncoder().encode(material);
-    const signature = base64ToArrayBuffer(signatureValue);
+      const data = new TextEncoder().encode(material);
+      const signature = base64ToArrayBuffer(signatureValue);
 
-    return await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, signature, data);
-  };
+      return await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, signature, data);
+    },
+  );
 
   getAlgorithmName = (): string => {
     return "http://www.w3.org/2001/04/xmldsig-more#rsa-sha512";
@@ -143,34 +143,34 @@ export class WebCryptoRsaSha512 implements SignatureAlgorithm {
  * Uses the Web Crypto API which is available in browsers and modern Node.js
  */
 export class WebCryptoHmacSha1 implements SignatureAlgorithm {
-  getSignature = async (signedInfo: unknown, privateKey: unknown): Promise<string> => {
-    const key =
-      typeof privateKey === "string"
-        ? await importHmacKey(privateKey, "SHA-1")
-        : (privateKey as CryptoKey);
+  getSignature = createAsyncOptionalCallbackFunction(
+    async (signedInfo: unknown, privateKey: unknown): Promise<string> => {
+      const key =
+        typeof privateKey === "string"
+          ? await importHmacKey(privateKey, "SHA-1")
+          : (privateKey as CryptoKey);
 
-    const data = toArrayBuffer(signedInfo);
+      const data = toArrayBuffer(signedInfo);
 
-    const signature = await crypto.subtle.sign("HMAC", key, data);
+      const signature = await crypto.subtle.sign("HMAC", key, data);
 
-    return arrayBufferToBase64(signature);
-  };
+      return arrayBufferToBase64(signature);
+    },
+  );
 
-  verifySignature = async (
-    material: string,
-    key: unknown,
-    signatureValue: string,
-  ): Promise<boolean> => {
-    const hmacKey =
-      typeof key === "string" ? await importHmacKey(key, "SHA-1") : (key as CryptoKey);
+  verifySignature = createAsyncOptionalCallbackFunction(
+    async (material: string, key: unknown, signatureValue: string): Promise<boolean> => {
+      const hmacKey =
+        typeof key === "string" ? await importHmacKey(key, "SHA-1") : (key as CryptoKey);
 
-    const data = new TextEncoder().encode(material);
+      const data = new TextEncoder().encode(material);
 
-    const signature = await crypto.subtle.sign("HMAC", hmacKey, data);
-    const computedSignature = arrayBufferToBase64(signature);
+      const signature = await crypto.subtle.sign("HMAC", hmacKey, data);
+      const computedSignature = arrayBufferToBase64(signature);
 
-    return computedSignature === signatureValue;
-  };
+      return computedSignature === signatureValue;
+    },
+  );
 
   getAlgorithmName = (): string => {
     return "http://www.w3.org/2000/09/xmldsig#hmac-sha1";

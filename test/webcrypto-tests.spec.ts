@@ -459,3 +459,96 @@ describe("WebCrypto HMAC XML Signing", function () {
     expect(isValid).to.be.true;
   });
 });
+
+describe("WebCrypto Callback-Style API", function () {
+  let privateKey: string;
+  let publicKey: string;
+
+  before(function () {
+    privateKey = readFileSync("./test/static/client.pem", "utf8");
+    publicKey = readFileSync("./test/static/client_public.pem", "utf8");
+  });
+
+  it("should support callback-style getSignature for RSA-SHA1", function (done) {
+    const signer = new WebCryptoRsaSha1();
+    const data = "test data";
+
+    signer.getSignature(data, privateKey, (err, signature) => {
+      if (err) {
+        return done(err);
+      }
+      expect(signature).to.be.a("string");
+      if (signature) {
+        expect(signature.length).to.be.greaterThan(0);
+      }
+      done();
+    });
+  });
+
+  it("should support callback-style verifySignature for RSA-SHA256", function (done) {
+    const signer = new WebCryptoRsaSha256();
+    const data = "test data";
+
+    // First sign
+    signer.getSignature(data, privateKey, async (err, signature) => {
+      if (err || !signature) {
+        return done(err || new Error("No signature"));
+      }
+
+      // Then verify with callback
+      const crypto = await import("crypto");
+      const publicKeyObj = crypto.createPublicKey(publicKey);
+      const spkiPem = publicKeyObj.export({ type: "spki", format: "pem" }) as string;
+
+      signer.verifySignature(data, spkiPem, signature, (verifyErr, isValid) => {
+        if (verifyErr) {
+          return done(verifyErr);
+        }
+        expect(isValid).to.be.true;
+        done();
+      });
+    });
+  });
+
+  it("should support callback-style for HMAC-SHA1", function (done) {
+    const signer = new WebCryptoHmacSha1();
+    const data = "test data";
+    const key = "my-hmac-key";
+
+    signer.getSignature(data, key, (err, signature) => {
+      if (err || !signature) {
+        return done(err || new Error("No signature"));
+      }
+
+      signer.verifySignature(data, key, signature, (verifyErr, isValid) => {
+        if (verifyErr) {
+          return done(verifyErr);
+        }
+        expect(isValid).to.be.true;
+        done();
+      });
+    });
+  });
+
+  it("should handle errors in callback-style API", function (done) {
+    const signer = new WebCryptoRsaSha1();
+    const data = "test data";
+    const invalidKey = "not a valid key";
+
+    signer.getSignature(data, invalidKey, (err) => {
+      expect(err).to.exist;
+      expect(err).to.be.instanceOf(Error);
+      done();
+    });
+  });
+
+  it("should support promise-style alongside callback-style", async function () {
+    const signer = new WebCryptoRsaSha256();
+    const data = "test data";
+
+    // Promise-style should still work
+    const signature = await signer.getSignature(data, privateKey);
+    expect(signature).to.be.a("string");
+    expect(signature.length).to.be.greaterThan(0);
+  });
+});
