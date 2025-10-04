@@ -82,7 +82,7 @@ export class RsaSha512 implements SignatureAlgorithm {
 export class HmacSha1 implements SignatureAlgorithm {
   getSignature = createOptionalCallbackFunction(
     (signedInfo: crypto.BinaryLike, privateKey: crypto.KeyLike): string => {
-      const signer = crypto.createHmac("SHA1", privateKey);
+      const signer = crypto.createHmac("SHA1", privateKey as crypto.BinaryLike | crypto.KeyObject);
       signer.update(signedInfo);
       const res = signer.digest("base64");
 
@@ -92,7 +92,7 @@ export class HmacSha1 implements SignatureAlgorithm {
 
   verifySignature = createOptionalCallbackFunction(
     (material: string, key: crypto.KeyLike, signatureValue: string): boolean => {
-      const verifier = crypto.createHmac("SHA1", key);
+      const verifier = crypto.createHmac("SHA1", key as crypto.BinaryLike | crypto.KeyObject);
       verifier.update(material);
       const res = verifier.digest("base64");
 

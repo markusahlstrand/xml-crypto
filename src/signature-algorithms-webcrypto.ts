@@ -26,18 +26,59 @@ function isCryptoKey(key: unknown): key is CryptoKey {
 }
 
 /**
- * Convert various key input types to a string (PEM format) that can be imported
+ * Check if a value is a Node.js Buffer (without using Buffer.isBuffer for browser compat)
  */
-function keyToString(key: unknown): string {
+function isBuffer(value: unknown): value is Uint8Array {
+  return value instanceof Uint8Array && value.constructor.name === "Buffer";
+}
+
+/**
+ * Check if a Uint8Array/Buffer contains valid UTF-8 text (like PEM format).
+ * This helps us distinguish between text-based keys (PEM) and binary keys (DER, raw bytes).
+ */
+function isPemText(data: Uint8Array): boolean {
+  try {
+    const text = new TextDecoder("utf-8", { fatal: true }).decode(data);
+    // Check if it looks like PEM format
+    return text.includes("-----BEGIN") && text.includes("-----END");
+  } catch {
+    // Not valid UTF-8 text
+    return false;
+  }
+}
+
+/**
+ * Normalize various key input types to a format suitable for Web Crypto API.
+ * Returns either a PEM string (for RSA keys) or ArrayBuffer (for raw binary keys like HMAC).
+ * Preserves binary data without UTF-8 mangling.
+ */
+function normalizeKey(key: unknown): string | ArrayBuffer {
   if (typeof key === "string") {
     return key;
   }
-  if (Buffer.isBuffer(key)) {
-    return key.toString("utf8");
+
+  // Handle Uint8Array or Buffer
+  if (key instanceof Uint8Array || isBuffer(key)) {
+    const uint8Array = key as Uint8Array;
+
+    // Check if this contains PEM text (common case: Buffer wrapping PEM string)
+    if (isPemText(uint8Array)) {
+      // Decode as UTF-8 text
+      return new TextDecoder("utf-8").decode(uint8Array);
+    }
+
+    // Otherwise, preserve as binary (for DER keys, raw HMAC keys, etc.)
+    const buffer = new ArrayBuffer(uint8Array.byteLength);
+    const view = new Uint8Array(buffer);
+    view.set(uint8Array);
+    return buffer;
   }
-  if (key instanceof Uint8Array) {
-    return Buffer.from(key).toString("utf8");
+
+  // Handle ArrayBuffer - return as-is (assume binary)
+  if (key instanceof ArrayBuffer) {
+    return key;
   }
+
   // Handle Node.js KeyObject
   if (
     typeof key === "object" &&
@@ -53,13 +94,17 @@ function keyToString(key: unknown): string {
     } else if (keyObject.type === "public") {
       return keyObject.export({ type: "spki", format: "pem" }) as string;
     } else if (keyObject.type === "secret") {
-      // For secret keys (HMAC), export as buffer and convert to base64
+      // For secret keys (HMAC), export as buffer and preserve binary data
       const secretBuffer = keyObject.export();
-      return secretBuffer.toString("base64");
+      // Convert to ArrayBuffer while preserving binary data
+      const arrayBuffer = new ArrayBuffer(secretBuffer.byteLength);
+      const view = new Uint8Array(arrayBuffer);
+      view.set(secretBuffer);
+      return arrayBuffer;
     }
   }
   throw new Error(
-    "Unsupported key type. Expected string (PEM), Buffer, Uint8Array, KeyObject, or CryptoKey",
+    "Unsupported key type. Expected string (PEM), Buffer, Uint8Array, ArrayBuffer, KeyObject, or CryptoKey",
   );
 }
 
@@ -95,9 +140,12 @@ export class WebCryptoRsaSha1 implements SignatureAlgorithm {
       if (isCryptoKey(privateKey)) {
         key = privateKey;
       } else {
-        // Convert to string (handles Buffer, KeyObject, etc.) and import
-        const keyString = keyToString(privateKey);
-        key = await importRsaPrivateKey(keyString, "SHA-1");
+        // Normalize key (handles Buffer, KeyObject, etc.)
+        const normalizedKey = normalizeKey(privateKey);
+        if (typeof normalizedKey !== "string") {
+          throw new Error("RSA private keys must be in PEM format (string)");
+        }
+        key = await importRsaPrivateKey(normalizedKey, "SHA-1");
       }
 
       const data = toArrayBuffer(signedInfo);
@@ -115,9 +163,12 @@ export class WebCryptoRsaSha1 implements SignatureAlgorithm {
       if (isCryptoKey(key)) {
         publicKey = key;
       } else {
-        // Convert to string (handles Buffer, KeyObject, etc.) and import
-        const keyString = keyToString(key);
-        publicKey = await importRsaPublicKey(keyString, "SHA-1");
+        // Normalize key (handles Buffer, KeyObject, etc.)
+        const normalizedKey = normalizeKey(key);
+        if (typeof normalizedKey !== "string") {
+          throw new Error("RSA public keys must be in PEM format (string)");
+        }
+        publicKey = await importRsaPublicKey(normalizedKey, "SHA-1");
       }
 
       const data = new TextEncoder().encode(material);
@@ -144,9 +195,12 @@ export class WebCryptoRsaSha256 implements SignatureAlgorithm {
       if (isCryptoKey(privateKey)) {
         key = privateKey;
       } else {
-        // Convert to string (handles Buffer, KeyObject, etc.) and import
-        const keyString = keyToString(privateKey);
-        key = await importRsaPrivateKey(keyString, "SHA-256");
+        // Normalize key (handles Buffer, KeyObject, etc.)
+        const normalizedKey = normalizeKey(privateKey);
+        if (typeof normalizedKey !== "string") {
+          throw new Error("RSA private keys must be in PEM format (string)");
+        }
+        key = await importRsaPrivateKey(normalizedKey, "SHA-256");
       }
 
       const data = toArrayBuffer(signedInfo);
@@ -164,9 +218,12 @@ export class WebCryptoRsaSha256 implements SignatureAlgorithm {
       if (isCryptoKey(key)) {
         publicKey = key;
       } else {
-        // Convert to string (handles Buffer, KeyObject, etc.) and import
-        const keyString = keyToString(key);
-        publicKey = await importRsaPublicKey(keyString, "SHA-256");
+        // Normalize key (handles Buffer, KeyObject, etc.)
+        const normalizedKey = normalizeKey(key);
+        if (typeof normalizedKey !== "string") {
+          throw new Error("RSA public keys must be in PEM format (string)");
+        }
+        publicKey = await importRsaPublicKey(normalizedKey, "SHA-256");
       }
 
       const data = new TextEncoder().encode(material);
@@ -193,9 +250,12 @@ export class WebCryptoRsaSha512 implements SignatureAlgorithm {
       if (isCryptoKey(privateKey)) {
         key = privateKey;
       } else {
-        // Convert to string (handles Buffer, KeyObject, etc.) and import
-        const keyString = keyToString(privateKey);
-        key = await importRsaPrivateKey(keyString, "SHA-512");
+        // Normalize key (handles Buffer, KeyObject, etc.)
+        const normalizedKey = normalizeKey(privateKey);
+        if (typeof normalizedKey !== "string") {
+          throw new Error("RSA private keys must be in PEM format (string)");
+        }
+        key = await importRsaPrivateKey(normalizedKey, "SHA-512");
       }
 
       const data = toArrayBuffer(signedInfo);
@@ -213,9 +273,12 @@ export class WebCryptoRsaSha512 implements SignatureAlgorithm {
       if (isCryptoKey(key)) {
         publicKey = key;
       } else {
-        // Convert to string (handles Buffer, KeyObject, etc.) and import
-        const keyString = keyToString(key);
-        publicKey = await importRsaPublicKey(keyString, "SHA-512");
+        // Normalize key (handles Buffer, KeyObject, etc.)
+        const normalizedKey = normalizeKey(key);
+        if (typeof normalizedKey !== "string") {
+          throw new Error("RSA public keys must be in PEM format (string)");
+        }
+        publicKey = await importRsaPublicKey(normalizedKey, "SHA-512");
       }
 
       const data = new TextEncoder().encode(material);
@@ -242,9 +305,10 @@ export class WebCryptoHmacSha1 implements SignatureAlgorithm {
       if (isCryptoKey(privateKey)) {
         key = privateKey;
       } else {
-        // Convert to string (handles Buffer, KeyObject, etc.) and import
-        const keyString = keyToString(privateKey);
-        key = await importHmacKey(keyString, "SHA-1");
+        // Normalize key (handles Buffer, KeyObject, etc.)
+        // HMAC keys can be binary (ArrayBuffer) or string
+        const normalizedKey = normalizeKey(privateKey);
+        key = await importHmacKey(normalizedKey, "SHA-1");
       }
 
       const data = toArrayBuffer(signedInfo);
@@ -262,9 +326,10 @@ export class WebCryptoHmacSha1 implements SignatureAlgorithm {
       if (isCryptoKey(key)) {
         hmacKey = key;
       } else {
-        // Convert to string (handles Buffer, KeyObject, etc.) and import
-        const keyString = keyToString(key);
-        hmacKey = await importHmacKey(keyString, "SHA-1");
+        // Normalize key (handles Buffer, KeyObject, etc.)
+        // HMAC keys can be binary (ArrayBuffer) or string
+        const normalizedKey = normalizeKey(key);
+        hmacKey = await importHmacKey(normalizedKey, "SHA-1");
       }
 
       const data = new TextEncoder().encode(material);
