@@ -8,6 +8,7 @@ import type {
   GetKeyInfoContentArgs,
   HashAlgorithm,
   HashAlgorithmType,
+  KeyLike,
   Reference,
   SignatureAlgorithm,
   SignatureAlgorithmType,
@@ -16,7 +17,6 @@ import type {
 
 import * as isDomNode from "@xmldom/is-dom-node";
 import * as xmldom from "@xmldom/xmldom";
-import * as crypto from "crypto";
 import { deprecate } from "util";
 import * as xpath from "xpath";
 import * as c14n from "./c14n-canonicalization";
@@ -32,8 +32,8 @@ export class SignedXml {
   /**
    * A {@link Buffer} or pem encoded {@link String} containing your private key
    */
-  privateKey?: crypto.KeyLike;
-  publicCert?: crypto.KeyLike;
+  privateKey?: KeyLike;
+  publicCert?: KeyLike;
   /**
    * One of the supported signature algorithms.
    * @see {@link SignatureAlgorithmType}

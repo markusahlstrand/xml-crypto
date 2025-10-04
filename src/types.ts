@@ -10,6 +10,12 @@ import * as crypto from "crypto";
 
 export type ErrorFirstCallback<T> = (err: Error | null, result?: T) => void;
 
+/**
+ * Key types that can be used with xml-crypto.
+ * Includes Node.js crypto.KeyLike (for Node.js crypto) and Web Crypto API CryptoKey.
+ */
+export type KeyLike = crypto.KeyLike | CryptoKey;
+
 export type CanonicalizationAlgorithmType =
   | "http://www.w3.org/TR/2001/REC-xml-c14n-20010315"
   | "http://www.w3.org/TR/2001/REC-xml-c14n-20010315#WithComments"
@@ -39,7 +45,7 @@ export type SignatureAlgorithmType =
  * @param prefix an optional namespace alias to be used for the generated XML
  */
 export interface GetKeyInfoContentArgs {
-  publicCert?: crypto.KeyLike;
+  publicCert?: KeyLike;
   prefix?: string | null;
 }
 
@@ -49,8 +55,8 @@ export interface GetKeyInfoContentArgs {
 export interface SignedXmlOptions {
   idMode?: "wssecurity";
   idAttribute?: string;
-  privateKey?: crypto.KeyLike;
-  publicCert?: crypto.KeyLike;
+  privateKey?: KeyLike;
+  publicCert?: KeyLike;
   signatureAlgorithm?: SignatureAlgorithmType;
   canonicalizationAlgorithm?: CanonicalizationAlgorithmType;
   inclusiveNamespacesPrefixList?: string | string[];
@@ -159,10 +165,10 @@ export interface SignatureAlgorithm {
   /**
    * Sign the given string using the given key
    */
-  getSignature(signedInfo: crypto.BinaryLike, privateKey: crypto.KeyLike): string | Promise<string>;
+  getSignature(signedInfo: crypto.BinaryLike, privateKey: KeyLike): string | Promise<string>;
   getSignature(
     signedInfo: crypto.BinaryLike,
-    privateKey: crypto.KeyLike,
+    privateKey: KeyLike,
     callback?: ErrorFirstCallback<string>,
   ): void;
   /**
@@ -172,12 +178,12 @@ export interface SignatureAlgorithm {
    */
   verifySignature(
     material: string,
-    key: crypto.KeyLike,
+    key: KeyLike,
     signatureValue: string,
   ): boolean | Promise<boolean>;
   verifySignature(
     material: string,
-    key: crypto.KeyLike,
+    key: KeyLike,
     signatureValue: string,
     callback?: ErrorFirstCallback<boolean>,
   ): void;
