@@ -380,6 +380,152 @@ export class SignedXml {
     }
   }
 
+  /**
+   * Validates the signature of the provided XML document asynchronously.
+   * This method is designed to work with async algorithms (like WebCrypto).
+   *
+   * @param xml The XML document containing the signature to be validated.
+   * @returns Promise<boolean> that resolves to true if the signature is valid
+   * @throws Error if validation fails
+   */
+  async checkSignatureAsync(xml: string): Promise<boolean> {
+    this.signedXml = xml;
+
+    const doc = new xmldom.DOMParser().parseFromString(xml);
+
+    // Find and load the signature if not already loaded
+    if (!this.signatureNode) {
+      const signatures = this.findSignatures(doc);
+      if (signatures.length === 0) {
+        throw new Error("No signature found in the document");
+      }
+      if (signatures.length > 1) {
+        throw new Error(
+          "Multiple signatures found. Use loadSignature() to specify which signature to validate",
+        );
+      }
+      this.loadSignature(signatures[0]);
+    }
+
+    // Reset the references as only references from our re-parsed signedInfo node can be trusted
+    this.references = [];
+
+    const unverifiedSignedInfoCanon = this.getCanonSignedInfoXml(doc);
+    if (!unverifiedSignedInfoCanon) {
+      throw new Error("Canonical signed info cannot be empty");
+    }
+
+    const parsedUnverifiedSignedInfo = new xmldom.DOMParser().parseFromString(
+      unverifiedSignedInfoCanon,
+      "text/xml",
+    );
+
+    const unverifiedSignedInfoDoc = parsedUnverifiedSignedInfo.documentElement;
+    if (!unverifiedSignedInfoDoc) {
+      throw new Error("Could not parse unverifiedSignedInfoCanon into a document");
+    }
+
+    const references = utils.findChildren(unverifiedSignedInfoDoc, "Reference");
+    if (!utils.isArrayHasLength(references)) {
+      throw new Error("could not find any Reference elements");
+    }
+
+    for (const reference of references) {
+      this.loadReference(reference);
+    }
+
+    // Validate all references asynchronously
+    const validationResults = await Promise.all(
+      /* eslint-disable-next-line deprecation/deprecation */
+      this.getReferences().map((ref) => this.validateReferenceAsync(ref, doc)),
+    );
+
+    if (!validationResults.every((result) => result)) {
+      this.signedReferences = [];
+      this.references.forEach((ref) => {
+        ref.signedReference = undefined;
+      });
+      throw new Error("Could not validate all references");
+    }
+
+    // Verify the signature
+    const signer = this.findSignatureAlgorithm(this.signatureAlgorithm);
+    const key = this.getCertFromKeyInfo(this.keyInfo) || this.publicCert || this.privateKey;
+    if (key == null) {
+      throw new Error("KeyInfo or publicCert or privateKey is required to validate signature");
+    }
+
+    const sigRes = await Promise.resolve(
+      signer.verifySignature(unverifiedSignedInfoCanon, key, this.signatureValue),
+    );
+
+    if (sigRes === true) {
+      return true;
+    } else {
+      this.signedReferences = [];
+      this.references.forEach((ref) => {
+        ref.signedReference = undefined;
+      });
+      throw new Error(`invalid signature: the signature value ${this.signatureValue} is incorrect`);
+    }
+  }
+
+  private async validateReferenceAsync(ref: Reference, doc: Document): Promise<boolean> {
+    const uri = ref.uri?.[0] === "#" ? ref.uri.substring(1) : ref.uri;
+    let elem: xpath.SelectSingleReturnType = null;
+
+    if (uri === "") {
+      elem = xpath.select1("//*", doc);
+    } else if (uri?.indexOf("'") !== -1) {
+      throw new Error("Cannot validate a uri with quotes inside it");
+    } else {
+      let num_elements_for_id = 0;
+      for (const attr of this.idAttributes) {
+        const tmp_elemXpath = `//*[@*[local-name(.)='${attr}']='${uri}']`;
+        const tmp_elem = xpath.select(tmp_elemXpath, doc);
+        if (utils.isArrayHasLength(tmp_elem)) {
+          num_elements_for_id += tmp_elem.length;
+
+          if (num_elements_for_id > 1) {
+            throw new Error(
+              "Cannot validate a document which contains multiple elements with the " +
+                "same value for the ID / Id / Id attributes, in order to prevent " +
+                "signature wrapping attack.",
+            );
+          }
+
+          elem = tmp_elem[0];
+          ref.xpath = tmp_elemXpath;
+        }
+      }
+    }
+
+    if (!isDomNode.isNodeLike(elem)) {
+      const validationError = new Error(
+        `invalid signature: the signature references an element with uri ${ref.uri} but could not find such element in the xml`,
+      );
+      ref.validationError = validationError;
+      return false;
+    }
+
+    const canonXml = this.getCanonReferenceXml(doc, ref, elem);
+    const hash = this.findHashAlgorithm(ref.digestAlgorithm);
+    const digest = await Promise.resolve(hash.getHash(canonXml));
+
+    if (!utils.validateDigestValue(digest, ref.digestValue)) {
+      const validationError = new Error(
+        `invalid signature: for uri ${ref.uri} calculated digest is ${digest} but the xml to validate supplies digest ${ref.digestValue}`,
+      );
+      ref.validationError = validationError;
+      return false;
+    }
+
+    this.signedReferences.push(canonXml);
+    ref.signedReference = canonXml;
+
+    return true;
+  }
+
   private getCanonSignedInfoXml(doc: Document) {
     if (this.signatureNode == null) {
       throw new Error("No signature found.");
@@ -447,7 +593,13 @@ export class SignedXml {
     if (typeof callback === "function") {
       signer.getSignature(signedInfoCanon, this.privateKey, callback);
     } else {
-      this.signatureValue = signer.getSignature(signedInfoCanon, this.privateKey);
+      const result = signer.getSignature(signedInfoCanon, this.privateKey);
+      if (result instanceof Promise) {
+        throw new Error(
+          "Async signature algorithms cannot be used with sync methods. Use computeSignatureAsync() instead.",
+        );
+      }
+      this.signatureValue = result;
     }
   }
 
@@ -1050,6 +1202,217 @@ export class SignedXml {
       this.signatureXml = signatureDoc.toString();
       this.signedXml = doc.toString();
     }
+  }
+
+  /**
+   * Compute the signature of the given XML asynchronously (for use with async algorithms like WebCrypto).
+   *
+   * @param xml The XML to compute the signature for.
+   * @param options An object containing options for the signature computation.
+   * @returns Promise<SignedXml> Returns a promise that resolves to the instance of SignedXml.
+   * @throws TypeError If the xml cannot be parsed, or Error if there were invalid options passed.
+   */
+  async computeSignatureAsync(xml: string, options?: ComputeSignatureOptions): Promise<SignedXml> {
+    options = (options ?? {}) as ComputeSignatureOptions;
+
+    const doc = new xmldom.DOMParser().parseFromString(xml);
+    let xmlNsAttr = "xmlns";
+    const signatureAttrs: string[] = [];
+    let currentPrefix: string;
+
+    const validActions = ["append", "prepend", "before", "after"];
+
+    const prefix = options.prefix;
+    const attrs = options.attrs || {};
+    const location = options.location || {};
+    const existingPrefixes = options.existingPrefixes || {};
+
+    this.namespaceResolver = {
+      lookupNamespaceURI: function (prefix) {
+        return prefix ? existingPrefixes[prefix] : null;
+      },
+    };
+
+    location.reference = location.reference || "/*";
+    location.action = location.action || "append";
+
+    if (validActions.indexOf(location.action) === -1) {
+      throw new Error(
+        `location.action option has an invalid action: ${
+          location.action
+        }, must be any of the following values: ${validActions.join(", ")}`,
+      );
+    }
+
+    if (prefix) {
+      xmlNsAttr += `:${prefix}`;
+      currentPrefix = `${prefix}:`;
+    } else {
+      currentPrefix = "";
+    }
+
+    Object.keys(attrs).forEach(function (name) {
+      if (name !== "xmlns" && name !== xmlNsAttr) {
+        signatureAttrs.push(`${name}="${attrs[name]}"`);
+      }
+    });
+
+    signatureAttrs.push(`${xmlNsAttr}="http://www.w3.org/2000/09/xmldsig#"`);
+
+    let signatureXml = `<${currentPrefix}Signature ${signatureAttrs.join(" ")}>`;
+    signatureXml += await this.createSignedInfoAsync(doc, prefix);
+    signatureXml += this.getKeyInfo(prefix);
+    signatureXml += `</${currentPrefix}Signature>`;
+
+    this.originalXmlWithIds = doc.toString();
+
+    let existingPrefixesString = "";
+    Object.keys(existingPrefixes).forEach(function (key) {
+      existingPrefixesString += `xmlns:${key}="${existingPrefixes[key]}" `;
+    });
+
+    const dummySignatureWrapper = `<Dummy ${existingPrefixesString}>${signatureXml}</Dummy>`;
+    const nodeXml = new xmldom.DOMParser().parseFromString(dummySignatureWrapper);
+
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const signatureDoc = nodeXml.documentElement.firstChild!;
+
+    const referenceNode = xpath.select1(location.reference, doc);
+
+    if (!isDomNode.isNodeLike(referenceNode)) {
+      throw new Error(
+        `the following xpath cannot be used because it was not found: ${location.reference}`,
+      );
+    }
+
+    if (location.action === "append") {
+      referenceNode.appendChild(signatureDoc);
+    } else if (location.action === "prepend") {
+      referenceNode.insertBefore(signatureDoc, referenceNode.firstChild);
+    } else if (location.action === "before") {
+      if (referenceNode.parentNode == null) {
+        throw new Error(
+          "`location.reference` refers to the root node (by default), so we can't insert `before`",
+        );
+      }
+      referenceNode.parentNode.insertBefore(signatureDoc, referenceNode);
+    } else if (location.action === "after") {
+      if (referenceNode.parentNode == null) {
+        throw new Error(
+          "`location.reference` refers to the root node (by default), so we can't insert `after`",
+        );
+      }
+      referenceNode.parentNode.insertBefore(signatureDoc, referenceNode.nextSibling);
+    }
+
+    this.signatureNode = signatureDoc;
+    const signedInfoNodes = utils.findChildren(this.signatureNode, "SignedInfo");
+    if (signedInfoNodes.length === 0) {
+      throw new Error("could not find SignedInfo element in the message");
+    }
+    const signedInfoNode = signedInfoNodes[0];
+
+    // Calculate signature asynchronously
+    await this.calculateSignatureValueAsync(doc);
+    signatureDoc.insertBefore(this.createSignature(prefix), signedInfoNode.nextSibling);
+    this.signatureXml = signatureDoc.toString();
+    this.signedXml = doc.toString();
+
+    return this;
+  }
+
+  private async calculateSignatureValueAsync(doc: Document): Promise<void> {
+    const signedInfoCanon = this.getCanonSignedInfoXml(doc);
+    const signer = this.findSignatureAlgorithm(this.signatureAlgorithm);
+    if (this.privateKey == null) {
+      throw new Error("Private key is required to compute signature");
+    }
+    this.signatureValue = await Promise.resolve(
+      signer.getSignature(signedInfoCanon, this.privateKey),
+    );
+  }
+
+  private async createSignedInfoAsync(doc, prefix) {
+    if (typeof this.canonicalizationAlgorithm !== "string") {
+      throw new Error("Missing canonicalizationAlgorithm");
+    }
+    const transform = this.findCanonicalizationAlgorithm(this.canonicalizationAlgorithm);
+    const algo = this.findSignatureAlgorithm(this.signatureAlgorithm);
+
+    const currentPrefix = prefix || "";
+    const signaturePrefix = currentPrefix ? `${currentPrefix}:` : currentPrefix;
+
+    let res = `<${signaturePrefix}SignedInfo>`;
+    res += `<${signaturePrefix}CanonicalizationMethod Algorithm="${transform.getAlgorithmName()}"`;
+    if (utils.isArrayHasLength(this.inclusiveNamespacesPrefixList)) {
+      res += ">";
+      res += `<InclusiveNamespaces PrefixList="${this.inclusiveNamespacesPrefixList.join(
+        " ",
+      )}" xmlns="${transform.getAlgorithmName()}"/>`;
+      res += `</${signaturePrefix}CanonicalizationMethod>`;
+    } else {
+      res += " />";
+    }
+
+    res += `<${signaturePrefix}SignatureMethod Algorithm="${algo.getAlgorithmName()}" />`;
+    res += await this.createReferencesAsync(doc, prefix);
+    res += `</${signaturePrefix}SignedInfo>`;
+
+    return res;
+  }
+
+  private async createReferencesAsync(doc, prefix) {
+    let res = "";
+
+    prefix = prefix || "";
+    prefix = prefix ? `${prefix}:` : prefix;
+
+    /* eslint-disable-next-line deprecation/deprecation */
+    for (const ref of this.getReferences()) {
+      const nodes = xpath.selectWithResolver(ref.xpath ?? "", doc, this.namespaceResolver);
+
+      if (!utils.isArrayHasLength(nodes)) {
+        throw new Error(
+          `the following xpath cannot be signed because it was not found: ${ref.xpath}`,
+        );
+      }
+
+      for (const node of nodes) {
+        if (ref.isEmptyUri) {
+          res += `<${prefix}Reference URI="">`;
+        } else {
+          const id = this.ensureHasId(node);
+          ref.uri = id;
+          res += `<${prefix}Reference URI="#${id}">`;
+        }
+        res += `<${prefix}Transforms>`;
+        for (const trans of ref.transforms || []) {
+          const transform = this.findCanonicalizationAlgorithm(trans);
+          res += `<${prefix}Transform Algorithm="${transform.getAlgorithmName()}"`;
+          if (utils.isArrayHasLength(ref.inclusiveNamespacesPrefixList)) {
+            res += ">";
+            res += `<InclusiveNamespaces PrefixList="${ref.inclusiveNamespacesPrefixList.join(
+              " ",
+            )}" xmlns="${transform.getAlgorithmName()}"/>`;
+            res += `</${prefix}Transform>`;
+          } else {
+            res += " />";
+          }
+        }
+
+        const canonXml = this.getCanonReferenceXml(doc, ref, node);
+
+        const digestAlgorithm = this.findHashAlgorithm(ref.digestAlgorithm);
+        const digest = await Promise.resolve(digestAlgorithm.getHash(canonXml));
+        res +=
+          `</${prefix}Transforms>` +
+          `<${prefix}DigestMethod Algorithm="${digestAlgorithm.getAlgorithmName()}" />` +
+          `<${prefix}DigestValue>${digest}</${prefix}DigestValue>` +
+          `</${prefix}Reference>`;
+      }
+    }
+
+    return res;
   }
 
   private getKeyInfo(prefix) {

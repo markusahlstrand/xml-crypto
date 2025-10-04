@@ -151,7 +151,7 @@ export interface CanonicalizationOrTransformationAlgorithm {
 export interface HashAlgorithm {
   getAlgorithmName(): HashAlgorithmType;
 
-  getHash(xml: string): string;
+  getHash(xml: string): string | Promise<string>;
 }
 
 /** Extend this to create a new SignatureAlgorithm */
@@ -159,7 +159,7 @@ export interface SignatureAlgorithm {
   /**
    * Sign the given string using the given key
    */
-  getSignature(signedInfo: crypto.BinaryLike, privateKey: crypto.KeyLike): string;
+  getSignature(signedInfo: crypto.BinaryLike, privateKey: crypto.KeyLike): string | Promise<string>;
   getSignature(
     signedInfo: crypto.BinaryLike,
     privateKey: crypto.KeyLike,
@@ -170,7 +170,11 @@ export interface SignatureAlgorithm {
    *
    * @param key a public cert, public key, or private key can be passed here
    */
-  verifySignature(material: string, key: crypto.KeyLike, signatureValue: string): boolean;
+  verifySignature(
+    material: string,
+    key: crypto.KeyLike,
+    signatureValue: string,
+  ): boolean | Promise<boolean>;
   verifySignature(
     material: string,
     key: crypto.KeyLike,
