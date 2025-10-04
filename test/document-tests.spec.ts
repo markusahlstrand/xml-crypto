@@ -42,6 +42,39 @@ describe("Document tests", function () {
     expect(result).to.be.true;
     expect(sig.getSignedReferences().length).to.equal(1);
   });
+
+  it("test checkSignature auto-loads signature when not explicitly loaded", function () {
+    const xml = fs.readFileSync("./test/static/invalid_signature - changed content.xml", "utf-8");
+    const sig = new SignedXml();
+    // Not calling loadSignature() - should auto-load
+    // This should load the signature automatically even though validation will fail
+    const result = sig.checkSignature(xml);
+
+    expect(result).to.be.false;
+    // The signature was loaded and processed, even though it's invalid
+    expect(sig.getSignedReferences().length).to.equal(0);
+  });
+
+  it("test checkSignature throws error when no signature found", function () {
+    const xml = "<root><data>test</data></root>";
+    const sig = new SignedXml();
+    sig.publicCert = fs.readFileSync("./test/static/feide_public.pem");
+
+    expect(() => sig.checkSignature(xml)).to.throw("No signature found in the document");
+  });
+
+  it("test checkSignature with callback handles no signature error", function (done) {
+    const xml = "<root><data>test</data></root>";
+    const sig = new SignedXml();
+    sig.publicCert = fs.readFileSync("./test/static/feide_public.pem");
+
+    sig.checkSignature(xml, (error, isValid) => {
+      expect(error).to.exist;
+      expect(error?.message).to.equal("No signature found in the document");
+      expect(isValid).to.be.false;
+      done();
+    });
+  });
 });
 
 describe("Validated node references tests", function () {

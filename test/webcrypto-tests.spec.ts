@@ -552,3 +552,110 @@ describe("WebCrypto Callback-Style API", function () {
     expect(signature.length).to.be.greaterThan(0);
   });
 });
+
+describe("WebCrypto Key Type Support", function () {
+  let privateKeyString: string;
+  let privateKeyBuffer: Buffer;
+  let publicKeyString: string;
+  let publicKeyBuffer: Buffer;
+
+  before(function () {
+    privateKeyString = readFileSync("./test/static/client.pem", "utf8");
+    privateKeyBuffer = readFileSync("./test/static/client.pem");
+    publicKeyString = readFileSync("./test/static/client_public.pem", "utf8");
+    publicKeyBuffer = readFileSync("./test/static/client_public.pem");
+  });
+
+  it("should accept Buffer as private key for signing", async function () {
+    const signer = new WebCryptoRsaSha256();
+    const data = "test data with buffer key";
+
+    const signature = await signer.getSignature(data, privateKeyBuffer);
+    expect(signature).to.be.a("string");
+    expect(signature.length).to.be.greaterThan(0);
+  });
+
+  it("should accept Buffer as public key for verification", async function () {
+    const signer = new WebCryptoRsaSha256();
+    const data = "test data with buffer key";
+
+    // Sign with string key
+    const signature = await signer.getSignature(data, privateKeyString);
+
+    // Verify with buffer key
+    const crypto = await import("crypto");
+    const publicKeyObj = crypto.createPublicKey(publicKeyBuffer);
+    const spkiPem = publicKeyObj.export({ type: "spki", format: "pem" }) as string;
+
+    const isValid = await signer.verifySignature(data, Buffer.from(spkiPem), signature);
+    expect(isValid).to.be.true;
+  });
+
+  it("should accept KeyObject as private key for signing", async function () {
+    const crypto = await import("crypto");
+    const signer = new WebCryptoRsaSha256();
+    const data = "test data with KeyObject";
+
+    const privateKeyObj = crypto.createPrivateKey(privateKeyString);
+    const signature = await signer.getSignature(data, privateKeyObj);
+    expect(signature).to.be.a("string");
+    expect(signature.length).to.be.greaterThan(0);
+  });
+
+  it("should accept KeyObject as public key for verification", async function () {
+    const crypto = await import("crypto");
+    const signer = new WebCryptoRsaSha256();
+    const data = "test data with KeyObject";
+
+    // Sign with string key
+    const signature = await signer.getSignature(data, privateKeyString);
+
+    // Verify with KeyObject
+    const publicKeyObj = crypto.createPublicKey(publicKeyString);
+
+    const isValid = await signer.verifySignature(data, publicKeyObj, signature);
+    expect(isValid).to.be.true;
+  });
+
+  it("should accept secret KeyObject for HMAC signing", async function () {
+    const crypto = await import("crypto");
+    const signer = new WebCryptoHmacSha1();
+    const data = "test data with secret KeyObject";
+
+    // Create a secret KeyObject
+    const secretKey = crypto.createSecretKey(Uint8Array.from(Buffer.from("my-hmac-secret-key")));
+    const signature = await signer.getSignature(data, secretKey);
+    expect(signature).to.be.a("string");
+    expect(signature.length).to.be.greaterThan(0);
+
+    // Verify with same secret KeyObject
+    const isValid = await signer.verifySignature(data, secretKey, signature);
+    expect(isValid).to.be.true;
+  });
+
+  it("should accept Uint8Array as key", async function () {
+    const signer = new WebCryptoRsaSha256();
+    const data = "test data with Uint8Array";
+
+    const privateKeyUint8 = new Uint8Array(privateKeyBuffer);
+    const signature = await signer.getSignature(data, privateKeyUint8);
+    expect(signature).to.be.a("string");
+    expect(signature.length).to.be.greaterThan(0);
+  });
+
+  it("should work with Buffer keys in callback-style API", function (done) {
+    const signer = new WebCryptoRsaSha256();
+    const data = "test data with buffer in callback";
+
+    signer.getSignature(data, privateKeyBuffer, (err, signature) => {
+      if (err) {
+        return done(err);
+      }
+      expect(signature).to.be.a("string");
+      if (signature) {
+        expect(signature.length).to.be.greaterThan(0);
+      }
+      done();
+    });
+  });
+});

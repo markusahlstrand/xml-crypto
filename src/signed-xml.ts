@@ -266,6 +266,30 @@ export class SignedXml {
 
     const doc = new xmldom.DOMParser().parseFromString(xml);
 
+    // Find and load the signature if not already loaded
+    if (!this.signatureNode) {
+      const signatures = this.findSignatures(doc);
+      if (signatures.length === 0) {
+        const error = new Error("No signature found in the document");
+        if (callback) {
+          callback(error, false);
+          return;
+        }
+        throw error;
+      }
+      if (signatures.length > 1) {
+        const error = new Error(
+          "Multiple signatures found. Use loadSignature() to specify which signature to validate",
+        );
+        if (callback) {
+          callback(error, false);
+          return;
+        }
+        throw error;
+      }
+      this.loadSignature(signatures[0]);
+    }
+
     // Reset the references as only references from our re-parsed signedInfo node can be trusted
     this.references = [];
 
