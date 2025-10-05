@@ -10,11 +10,12 @@ import * as nodeCrypto from "crypto";
 
 /**
  * Check if a value is a CryptoKey (not a KeyObject)
+ * Guards against ReferenceError in environments without Web Crypto API
  */
 function isCryptoKey(key: unknown): key is CryptoKey {
   // CryptoKey has specific properties that KeyObject doesn't have
   return (
-    key instanceof CryptoKey ||
+    (typeof CryptoKey !== "undefined" && key instanceof CryptoKey) ||
     (typeof key === "object" &&
       key !== null &&
       "type" in key &&

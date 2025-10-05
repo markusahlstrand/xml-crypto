@@ -75,6 +75,46 @@ describe("Document tests", function () {
       done();
     });
   });
+
+  it("should not reuse stale signature from previous checkSignature call", function () {
+    const validXml = fs.readFileSync("./test/static/valid_signature.xml", "utf-8");
+    const sig = new SignedXml();
+    sig.publicCert = fs.readFileSync("./test/static/client_public.pem");
+
+    // First call with a valid signed document - should pass
+    const firstResult = sig.checkSignature(validXml);
+    expect(firstResult).to.be.true;
+
+    // Second call with an unsigned document (no signature element at all)
+    // Should throw an error about no signature found, not return true with the stale signature
+    const unsignedXml = "<root><data>test content</data></root>";
+
+    // This should throw an error about no signature found, not return true
+    expect(() => sig.checkSignature(unsignedXml)).to.throw("No signature found in the document");
+  });
+
+  it("should not reuse stale signature from previous checkSignatureAsync call", async function () {
+    const validXml = fs.readFileSync("./test/static/valid_signature.xml", "utf-8");
+    const sig = new SignedXml();
+    sig.publicCert = fs.readFileSync("./test/static/client_public.pem");
+
+    // First call with a valid signed document - should pass
+    const firstResult = await sig.checkSignatureAsync(validXml);
+    expect(firstResult).to.be.true;
+
+    // Second call with an unsigned document (no signature element at all)
+    // Should throw an error about no signature found, not return true with the stale signature
+    const unsignedXml = "<root><data>test content</data></root>";
+
+    // This should throw an error about no signature found, not return true
+    try {
+      await sig.checkSignatureAsync(unsignedXml);
+      expect.fail("Should have thrown an error");
+    } catch (error) {
+      expect(error).to.exist;
+      expect((error as Error).message).to.equal("No signature found in the document");
+    }
+  });
 });
 
 describe("Validated node references tests", function () {

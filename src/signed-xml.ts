@@ -75,6 +75,7 @@ export class SignedXml {
   private signatureValue = "";
   private originalXmlWithIds = "";
   private keyInfo: Node | null = null;
+  private signatureLoadedExplicitly = false;
 
   /**
    * Contains the references that were signed.
@@ -272,12 +273,14 @@ export class SignedXml {
       throw new Error("Last parameter must be a callback function");
     }
 
-    this.signedXml = xml;
-
     const doc = new xmldom.DOMParser().parseFromString(xml);
 
-    // Find and load the signature if not already loaded
-    if (!this.signatureNode) {
+    // Check if we need to find and load the signature:
+    // 1. If no signature has been loaded yet, OR
+    // 2. If the XML document has changed from the last checkSignature* call AND
+    //    the signature wasn't explicitly loaded by the user
+    const xmlChanged = this.signedXml !== undefined && this.signedXml !== xml;
+    if (!this.signatureNode || (xmlChanged && !this.signatureLoadedExplicitly)) {
       const signatures = this.findSignatures(doc);
       if (signatures.length === 0) {
         const error = new Error("No signature found in the document");
@@ -298,7 +301,11 @@ export class SignedXml {
         throw error;
       }
       this.loadSignature(signatures[0]);
+      // Mark that this was auto-loaded, not explicitly loaded
+      this.signatureLoadedExplicitly = false;
     }
+
+    this.signedXml = xml;
 
     // Reset the references as only references from our re-parsed signedInfo node can be trusted
     this.references = [];
@@ -423,12 +430,14 @@ export class SignedXml {
    * @throws Error if validation fails
    */
   async checkSignatureAsync(xml: string): Promise<boolean> {
-    this.signedXml = xml;
-
     const doc = new xmldom.DOMParser().parseFromString(xml);
 
-    // Find and load the signature if not already loaded
-    if (!this.signatureNode) {
+    // Check if we need to find and load the signature:
+    // 1. If no signature has been loaded yet, OR
+    // 2. If the XML document has changed from the last checkSignature* call AND
+    //    the signature wasn't explicitly loaded by the user
+    const xmlChanged = this.signedXml !== undefined && this.signedXml !== xml;
+    if (!this.signatureNode || (xmlChanged && !this.signatureLoadedExplicitly)) {
       const signatures = this.findSignatures(doc);
       if (signatures.length === 0) {
         throw new Error("No signature found in the document");
@@ -439,7 +448,11 @@ export class SignedXml {
         );
       }
       this.loadSignature(signatures[0]);
+      // Mark that this was auto-loaded, not explicitly loaded
+      this.signatureLoadedExplicitly = false;
     }
+
+    this.signedXml = xml;
 
     // Reset the references as only references from our re-parsed signedInfo node can be trusted
     this.references = [];
@@ -793,6 +806,9 @@ export class SignedXml {
     } else {
       this.signatureNode = signatureNode;
     }
+
+    // Mark that the signature was explicitly loaded
+    this.signatureLoadedExplicitly = true;
 
     this.signatureXml = signatureNode.toString();
 

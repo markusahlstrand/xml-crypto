@@ -8,7 +8,7 @@ import * as isDomNode from "@xmldom/is-dom-node";
 
 describe("Signature unit tests", function () {
   describe("verify adds ID", function () {
-    function nodeExists(doc, xpathArg) {
+    function nodeExists(doc: Document, xpathArg: string) {
       if (!doc && !xpathArg) {
         return;
       }
@@ -17,7 +17,7 @@ describe("Signature unit tests", function () {
       expect(node.length, `xpath ${xpathArg} not found`).to.equal(1);
     }
 
-    function verifyAddsId(mode, nsMode) {
+    function verifyAddsId(mode: "wssecurity" | undefined, nsMode: string) {
       const xml = '<root><x xmlns="ns"></x><y attr="value"></y><z><w></w></z></root>';
       const sig = new SignedXml({ idMode: mode });
       sig.privateKey = fs.readFileSync("./test/static/client.pem");
@@ -55,7 +55,7 @@ describe("Signature unit tests", function () {
     }
 
     it("signer adds increasing different id attributes to elements", function () {
-      verifyAddsId(null, "different");
+      verifyAddsId(undefined, "different");
     });
 
     it("signer adds increasing equal id attributes to elements", function () {
@@ -1031,7 +1031,7 @@ describe("Signature unit tests", function () {
   });
 
   it("signer adds existing prefixes", function () {
-    function getKeyInfoContentWithAssertionId({ assertionId }) {
+    function getKeyInfoContentWithAssertionId({ assertionId }: { assertionId: string }) {
       return (
         `<wsse:SecurityTokenReference wsse11:TokenType="http://docs.oasis-open.org/wss/oasis-wss-saml-token-profile-1.1#SAMLV1.1" wsu:Id="0" ` +
         `xmlns:wsse11="http://docs.oasis-open.org/wss/oasis-wss-wssecurity-secext-1.1.xsd"> ` +
