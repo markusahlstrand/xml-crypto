@@ -69,7 +69,7 @@ export class SignedXml {
 
   // Internal state
   private id = 0;
-  private signedXml = "";
+  private signedXml: string | undefined = undefined;
   private signatureXml = "";
   private signatureNode: Node | null = null;
   private signatureValue = "";
@@ -277,10 +277,12 @@ export class SignedXml {
 
     // Check if we need to find and load the signature:
     // 1. If no signature has been loaded yet, OR
-    // 2. If the XML document has changed from the last checkSignature* call AND
-    //    the signature wasn't explicitly loaded by the user
+    // 2. If the XML document has changed from the last checkSignature* call
+    //    (we must reload to prevent stale signatures)
     const xmlChanged = this.signedXml !== undefined && this.signedXml !== xml;
-    if (!this.signatureNode || (xmlChanged && !this.signatureLoadedExplicitly)) {
+    const shouldReloadSignature = !this.signatureNode || xmlChanged;
+
+    if (shouldReloadSignature) {
       const signatures = this.findSignatures(doc);
       if (signatures.length === 0) {
         const error = new Error("No signature found in the document");
@@ -434,10 +436,12 @@ export class SignedXml {
 
     // Check if we need to find and load the signature:
     // 1. If no signature has been loaded yet, OR
-    // 2. If the XML document has changed from the last checkSignature* call AND
-    //    the signature wasn't explicitly loaded by the user
+    // 2. If the XML document has changed from the last checkSignature* call
+    //    (we must reload to prevent stale signatures)
     const xmlChanged = this.signedXml !== undefined && this.signedXml !== xml;
-    if (!this.signatureNode || (xmlChanged && !this.signatureLoadedExplicitly)) {
+    const shouldReloadSignature = !this.signatureNode || xmlChanged;
+
+    if (shouldReloadSignature) {
       const signatures = this.findSignatures(doc);
       if (signatures.length === 0) {
         throw new Error("No signature found in the document");
@@ -1629,6 +1633,11 @@ export class SignedXml {
    * @returns The signed XML.
    */
   getSignedXml(): string {
+    if (this.signedXml === undefined) {
+      throw new Error(
+        "signedXml is not set. Call computeSignature() or computeSignatureAsync() first.",
+      );
+    }
     return this.signedXml;
   }
 }

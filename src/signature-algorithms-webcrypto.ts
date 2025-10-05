@@ -119,7 +119,7 @@ function toArrayBuffer(data: unknown): ArrayBuffer {
   if (data instanceof ArrayBuffer) {
     return data;
   }
-  if (data instanceof Uint8Array || Buffer.isBuffer(data)) {
+  if (data instanceof Uint8Array || isBuffer(data)) {
     // Create a new ArrayBuffer from the Uint8Array/Buffer
     const buffer = new ArrayBuffer((data as Uint8Array).byteLength);
     const view = new Uint8Array(buffer);
@@ -334,11 +334,10 @@ export class WebCryptoHmacSha1 implements SignatureAlgorithm {
       }
 
       const data = new TextEncoder().encode(material);
+      const signature = base64ToArrayBuffer(signatureValue);
 
-      const signature = await crypto.subtle.sign("HMAC", hmacKey, data);
-      const computedSignature = arrayBufferToBase64(signature);
-
-      return computedSignature === signatureValue;
+      // Use crypto.subtle.verify for constant-time comparison (prevents timing attacks)
+      return await crypto.subtle.verify("HMAC", hmacKey, signature, data);
     },
   );
 

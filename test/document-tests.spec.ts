@@ -115,6 +115,100 @@ describe("Document tests", function () {
       expect((error as Error).message).to.equal("No signature found in the document");
     }
   });
+
+  it("should not reuse manually loaded signature from different document", function () {
+    const validXml1 = fs.readFileSync("./test/static/valid_signature.xml", "utf-8");
+    const validXml2 = fs.readFileSync("./test/static/valid_signature_utf8.xml", "utf-8");
+
+    const sig = new SignedXml();
+    sig.publicCert = fs.readFileSync("./test/static/client_public.pem");
+
+    // Manually load signature from first document
+    const doc1 = new xmldom.DOMParser().parseFromString(validXml1);
+    const signature1 = sig.findSignatures(doc1)[0];
+    sig.loadSignature(signature1);
+
+    // First call should pass
+    const firstResult = sig.checkSignature(validXml1);
+    expect(firstResult).to.be.true;
+
+    // Second call with a DIFFERENT document should NOT reuse the signature from doc1
+    // It should auto-reload and use the signature from doc2
+    const secondResult = sig.checkSignature(validXml2);
+    expect(secondResult).to.be.true; // Should still validate correctly with doc2's signature
+  });
+
+  it("should not reuse manually loaded signature from different document (async)", async function () {
+    const validXml1 = fs.readFileSync("./test/static/valid_signature.xml", "utf-8");
+    const validXml2 = fs.readFileSync("./test/static/valid_signature_utf8.xml", "utf-8");
+
+    const sig = new SignedXml();
+    sig.publicCert = fs.readFileSync("./test/static/client_public.pem");
+
+    // Manually load signature from first document
+    const doc1 = new xmldom.DOMParser().parseFromString(validXml1);
+    const signature1 = sig.findSignatures(doc1)[0];
+    sig.loadSignature(signature1);
+
+    // First call should pass
+    const firstResult = await sig.checkSignatureAsync(validXml1);
+    expect(firstResult).to.be.true;
+
+    // Second call with a DIFFERENT document should NOT reuse the signature from doc1
+    // It should auto-reload and use the signature from doc2
+    const secondResult = await sig.checkSignatureAsync(validXml2);
+    expect(secondResult).to.be.true; // Should still validate correctly with doc2's signature
+  });
+
+  it("should prevent stale signature attack with manually loaded signature", function () {
+    const validXml = fs.readFileSync("./test/static/valid_signature.xml", "utf-8");
+
+    const sig = new SignedXml();
+    sig.publicCert = fs.readFileSync("./test/static/client_public.pem");
+
+    // Manually load signature from the valid document
+    const doc = new xmldom.DOMParser().parseFromString(validXml);
+    const signatureNode = sig.findSignatures(doc)[0];
+    sig.loadSignature(signatureNode);
+
+    // First call should pass
+    const firstResult = sig.checkSignature(validXml);
+    expect(firstResult).to.be.true;
+
+    // Try to validate an unsigned document - should fail
+    // Even though we manually loaded a signature, it shouldn't be reused for a different document
+    const unsignedXml = "<root><data>test content</data></root>";
+
+    expect(() => sig.checkSignature(unsignedXml)).to.throw("No signature found in the document");
+  });
+
+  it("should prevent stale signature attack with manually loaded signature (async)", async function () {
+    const validXml = fs.readFileSync("./test/static/valid_signature.xml", "utf-8");
+
+    const sig = new SignedXml();
+    sig.publicCert = fs.readFileSync("./test/static/client_public.pem");
+
+    // Manually load signature from the valid document
+    const doc = new xmldom.DOMParser().parseFromString(validXml);
+    const signatureNode = sig.findSignatures(doc)[0];
+    sig.loadSignature(signatureNode);
+
+    // First call should pass
+    const firstResult = await sig.checkSignatureAsync(validXml);
+    expect(firstResult).to.be.true;
+
+    // Try to validate an unsigned document - should fail
+    // Even though we manually loaded a signature, it shouldn't be reused for a different document
+    const unsignedXml = "<root><data>test content</data></root>";
+
+    try {
+      await sig.checkSignatureAsync(unsignedXml);
+      expect.fail("Should have thrown an error");
+    } catch (error) {
+      expect(error).to.exist;
+      expect((error as Error).message).to.equal("No signature found in the document");
+    }
+  });
 });
 
 describe("Validated node references tests", function () {
