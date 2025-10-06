@@ -276,23 +276,85 @@ export class SignedXml {
     const doc = new xmldom.DOMParser().parseFromString(xml);
 
     // Security: Prevent cross-document signature reuse attacks while supporting
-    // legitimate use of loadSignature() for documents with multiple signatures.
+    // legitimate use of loadSignature() for detached signatures and documents with
+    // multiple signatures.
     //
-    // Reload signature from the current document if:
-    // 1. No signature has been loaded yet, OR
-    // 2. The XML document has changed since the last validation
-    //
-    // Special case: If a signature was manually loaded via loadSignature()
-    // but we haven't validated any document yet (this.signedXml is undefined),
-    // allow using that manually loaded signature for the first validation.
-    // This supports the pattern: loadSignature(node) -> checkSignature(xml)
-    // for documents with multiple signatures.
+    // Strategy:
+    // 1. Always scan the current document for embedded signatures
+    // 2. If no embedded signature is found AND no signature was explicitly loaded,
+    //    reject immediately (unsigned document)
+    // 3. If signature was explicitly loaded and this is the FIRST validation,
+    //    allow using the preloaded signature (supports detached signatures)
+    // 4. If the XML has changed since last validation, reject reusing old signature
+    //    and require reloading from current document
+
+    const signatures = this.findSignatures(doc);
     const hasValidatedBefore = this.signedXml !== undefined;
     const xmlChanged = hasValidatedBefore && this.signedXml !== xml;
-    const shouldReloadSignature = !this.signatureNode || xmlChanged;
+
+    // If no signature in current document and none was preloaded, reject immediately
+    if (signatures.length === 0 && !this.signatureNode) {
+      const error = new Error("No signature found in the document");
+      if (callback) {
+        callback(error, false);
+        return;
+      }
+      throw error;
+    }
+
+    // Security: If we're validating for the first time after loadSignature() was called,
+    // and the current document has NO embedded signatures, we need to determine if this
+    // is a legitimate detached signature scenario or an attack.
+    //
+    // A detached signature is legitimate when the signature was loaded as a STANDALONE
+    // XML string (via loadSignature(string)). If loadSignature was called with a node
+    // extracted from a different document, we should reject.
+    //
+    // We detect detached signatures by checking if the signatureNode's root document
+    // contains only the signature (i.e., it's a standalone signature document).
+    if (!hasValidatedBefore && signatures.length === 0 && this.signatureNode) {
+      // Check if this is a detached signature (signature is the root element of its document)
+      // When loadSignature is called with a string, it creates a new Document where the
+      // Signature is the documentElement.
+      const signatureDoc = this.signatureNode.ownerDocument;
+      const isStandaloneSignatureDoc =
+        signatureDoc &&
+        signatureDoc.documentElement &&
+        signatureDoc.documentElement.localName === "Signature" &&
+        signatureDoc.documentElement.namespaceURI === "http://www.w3.org/2000/09/xmldsig#";
+
+      if (!isStandaloneSignatureDoc) {
+        // Signature was loaded from within another document, not as a detached signature
+        // Reject to prevent: loadSignature(sigFromDocA) -> checkSignature(unsignedDocB)
+        const error = new Error("No signature found in the document");
+        if (callback) {
+          callback(error, false);
+          return;
+        }
+        throw error;
+      }
+    }
+
+    // If XML changed from previous validation, we must reload from current document
+    // This prevents: checkSignature(docA) -> checkSignature(docB) reusing docA's signature
+    if (xmlChanged && signatures.length === 0) {
+      const error = new Error("No signature found in the document");
+      if (callback) {
+        callback(error, false);
+        return;
+      }
+      throw error;
+    }
+
+    // Determine if we should reload signature from current document
+    // Reload if: no signature loaded, XML changed, or signature was previously auto-loaded
+    // Keep preloaded signature only if it was explicitly loaded and this is first validation
+    const shouldReloadSignature =
+      !this.signatureNode ||
+      (xmlChanged && signatures.length > 0) ||
+      (!this.signatureLoadedExplicitly && hasValidatedBefore);
 
     if (shouldReloadSignature) {
-      const signatures = this.findSignatures(doc);
       if (signatures.length === 0) {
         const error = new Error("No signature found in the document");
         if (callback) {
@@ -444,23 +506,70 @@ export class SignedXml {
     const doc = new xmldom.DOMParser().parseFromString(xml);
 
     // Security: Prevent cross-document signature reuse attacks while supporting
-    // legitimate use of loadSignature() for documents with multiple signatures.
+    // legitimate use of loadSignature() for detached signatures and documents with
+    // multiple signatures.
     //
-    // Reload signature from the current document if:
-    // 1. No signature has been loaded yet, OR
-    // 2. The XML document has changed since the last validation
-    //
-    // Special case: If a signature was manually loaded via loadSignature()
-    // but we haven't validated any document yet (this.signedXml is undefined),
-    // allow using that manually loaded signature for the first validation.
-    // This supports the pattern: loadSignature(node) -> checkSignature(xml)
-    // for documents with multiple signatures.
+    // Strategy:
+    // 1. Always scan the current document for embedded signatures
+    // 2. If no embedded signature is found AND no signature was explicitly loaded,
+    //    reject immediately (unsigned document)
+    // 3. If signature was explicitly loaded and this is the FIRST validation,
+    //    allow using the preloaded signature (supports detached signatures)
+    // 4. If the XML has changed since last validation, reject reusing old signature
+    //    and require reloading from current document
+
+    const signatures = this.findSignatures(doc);
     const hasValidatedBefore = this.signedXml !== undefined;
     const xmlChanged = hasValidatedBefore && this.signedXml !== xml;
-    const shouldReloadSignature = !this.signatureNode || xmlChanged;
+
+    // If no signature in current document and none was preloaded, reject immediately
+    if (signatures.length === 0 && !this.signatureNode) {
+      throw new Error("No signature found in the document");
+    }
+
+    // Security: If we're validating for the first time after loadSignature() was called,
+    // and the current document has NO embedded signatures, we need to determine if this
+    // is a legitimate detached signature scenario or an attack.
+    //
+    // A detached signature is legitimate when the signature was loaded as a STANDALONE
+    // XML string (via loadSignature(string)). If loadSignature was called with a node
+    // extracted from a different document, we should reject.
+    //
+    // We detect detached signatures by checking if the signatureNode's root document
+    // contains only the signature (i.e., it's a standalone signature document).
+    if (!hasValidatedBefore && signatures.length === 0 && this.signatureNode) {
+      // Check if this is a detached signature (signature is the root element of its document)
+      // When loadSignature is called with a string, it creates a new Document where the
+      // Signature is the documentElement.
+      const signatureDoc = this.signatureNode.ownerDocument;
+      const isStandaloneSignatureDoc =
+        signatureDoc &&
+        signatureDoc.documentElement &&
+        signatureDoc.documentElement.localName === "Signature" &&
+        signatureDoc.documentElement.namespaceURI === "http://www.w3.org/2000/09/xmldsig#";
+
+      if (!isStandaloneSignatureDoc) {
+        // Signature was loaded from within another document, not as a detached signature
+        // Reject to prevent: loadSignature(sigFromDocA) -> checkSignatureAsync(unsignedDocB)
+        throw new Error("No signature found in the document");
+      }
+    }
+
+    // If XML changed from previous validation, we must reload from current document
+    // This prevents: checkSignature(docA) -> checkSignature(docB) reusing docA's signature
+    if (xmlChanged && signatures.length === 0) {
+      throw new Error("No signature found in the document");
+    }
+
+    // Determine if we should reload signature from current document
+    // Reload if: no signature loaded, XML changed, or signature was previously auto-loaded
+    // Keep preloaded signature only if it was explicitly loaded and this is first validation
+    const shouldReloadSignature =
+      !this.signatureNode ||
+      (xmlChanged && signatures.length > 0) ||
+      (!this.signatureLoadedExplicitly && hasValidatedBefore);
 
     if (shouldReloadSignature) {
-      const signatures = this.findSignatures(doc);
       if (signatures.length === 0) {
         throw new Error("No signature found in the document");
       }

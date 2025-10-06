@@ -209,6 +209,125 @@ describe("Document tests", function () {
       expect((error as Error).message).to.equal("No signature found in the document");
     }
   });
+
+  it("should reject unsigned document after preloading signature (vulnerability test)", function () {
+    // This test validates the fix for the vulnerability where:
+    // loadSignature() followed by checkSignature(unsignedXml) would incorrectly validate
+    // because shouldReloadSignature would be false (signedXml is undefined)
+
+    const validXml = fs.readFileSync("./test/static/valid_signature.xml", "utf-8");
+    const sig = new SignedXml();
+    sig.publicCert = fs.readFileSync("./test/static/client_public.pem");
+
+    // Load a valid signature from somewhere
+    const doc = new xmldom.DOMParser().parseFromString(validXml);
+    const signatureNode = sig.findSignatures(doc)[0];
+    sig.loadSignature(signatureNode);
+
+    // Now try to validate an UNSIGNED document
+    // Before the fix: this would pass validation using the preloaded signature!
+    // After the fix: this should reject because the unsigned document has no signature
+    const unsignedXml = "<root><data>unsigned malicious content</data></root>";
+
+    expect(() => sig.checkSignature(unsignedXml)).to.throw("No signature found in the document");
+  });
+
+  it("should reject unsigned document after preloading signature (async vulnerability test)", async function () {
+    // This test validates the fix for the vulnerability where:
+    // loadSignature() followed by checkSignatureAsync(unsignedXml) would incorrectly validate
+    // because shouldReloadSignature would be false (signedXml is undefined)
+
+    const validXml = fs.readFileSync("./test/static/valid_signature.xml", "utf-8");
+    const sig = new SignedXml();
+    sig.publicCert = fs.readFileSync("./test/static/client_public.pem");
+
+    // Load a valid signature from somewhere
+    const doc = new xmldom.DOMParser().parseFromString(validXml);
+    const signatureNode = sig.findSignatures(doc)[0];
+    sig.loadSignature(signatureNode);
+
+    // Now try to validate an UNSIGNED document
+    // Before the fix: this would pass validation using the preloaded signature!
+    // After the fix: this should reject because the unsigned document has no signature
+    const unsignedXml = "<root><data>unsigned malicious content</data></root>";
+
+    try {
+      await sig.checkSignatureAsync(unsignedXml);
+      expect.fail("Should have thrown 'No signature found in the document'");
+    } catch (error) {
+      expect(error).to.exist;
+      expect((error as Error).message).to.equal("No signature found in the document");
+    }
+  });
+
+  it("should allow detached signature scenario (first validation)", function () {
+    // This test ensures we still support legitimate detached signature use cases
+    // where the signature is stored separately from the content
+
+    const xml = "<library>" + "<book>" + "<name>Harry Potter</name>" + "</book>" + "</library>";
+
+    const signature =
+      '<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">' +
+      "<SignedInfo>" +
+      '<CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>' +
+      '<SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>' +
+      '<Reference URI="">' +
+      "<Transforms>" +
+      '<Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>' +
+      "</Transforms>" +
+      '<DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>' +
+      "<DigestValue>1tjZsV007JgvE1YFe1C8sMQ+iEg=</DigestValue>" +
+      "</Reference>" +
+      "</SignedInfo>" +
+      "<SignatureValue>FONRc5/nnQE2GMuEV0wK5/ofUJMHH7dzZ6VVd+oHDLfjfWax/lCMzUahJxW1i/dtm9Pl0t2FbJONVd3wwDSZzy6u5uCnj++iWYkRpIEN19RAzEMD1ejfZET8j3db9NeBq2JjrPbw81Fm7qKvte6jGa9ThTTB+1MHFRkC8qjukRM=</SignatureValue>" +
+      "</Signature>";
+
+    const sig = new SignedXml();
+    sig.publicCert = fs.readFileSync("./test/static/client_public.pem");
+    sig.loadSignature(signature);
+
+    // This should work: detached signature on first validation
+    const result = sig.checkSignature(xml);
+    expect(result).to.be.true;
+  });
+
+  it("should prevent signature reuse on second validation with different content", function () {
+    // This test validates that even with a preloaded detached signature,
+    // we can't reuse it for a second validation with different content
+
+    const xml1 = "<library>" + "<book>" + "<name>Harry Potter</name>" + "</book>" + "</library>";
+    const xml2 =
+      "<library>" + "<book>" + "<name>Malicious Content</name>" + "</book>" + "</library>";
+
+    const signature =
+      '<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">' +
+      "<SignedInfo>" +
+      '<CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>' +
+      '<SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>' +
+      '<Reference URI="">' +
+      "<Transforms>" +
+      '<Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/>' +
+      "</Transforms>" +
+      '<DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>' +
+      "<DigestValue>1tjZsV007JgvE1YFe1C8sMQ+iEg=</DigestValue>" +
+      "</Reference>" +
+      "</SignedInfo>" +
+      "<SignatureValue>FONRc5/nnQE2GMuEV0wK5/ofUJMHH7dzZ6VVd+oHDLfjfWax/lCMzUahJxW1i/dtm9Pl0t2FbJONVd3wwDSZzy6u5uCnj++iWYkRpIEN19RAzEMD1ejfZET8j3db9NeBq2JjrPbw81Fm7qKvte6jGa9ThTTB+1MHFRkC8qjukRM=</SignatureValue>" +
+      "</Signature>";
+
+    const sig = new SignedXml();
+    sig.publicCert = fs.readFileSync("./test/static/client_public.pem");
+    sig.loadSignature(signature);
+
+    // First validation should work
+    const result1 = sig.checkSignature(xml1);
+    expect(result1).to.be.true;
+
+    // Second validation with different content should fail
+    // because the signature doesn't match the new content
+    // and we can't find a signature in the new document
+    expect(() => sig.checkSignature(xml2)).to.throw("No signature found in the document");
+  });
 });
 
 describe("Validated node references tests", function () {
