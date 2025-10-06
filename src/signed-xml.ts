@@ -275,11 +275,20 @@ export class SignedXml {
 
     const doc = new xmldom.DOMParser().parseFromString(xml);
 
-    // Check if we need to find and load the signature:
-    // 1. If no signature has been loaded yet, OR
-    // 2. If the XML document has changed from the last checkSignature* call
-    //    (we must reload to prevent stale signatures)
-    const xmlChanged = this.signedXml !== undefined && this.signedXml !== xml;
+    // Security: Prevent cross-document signature reuse attacks while supporting
+    // legitimate use of loadSignature() for documents with multiple signatures.
+    //
+    // Reload signature from the current document if:
+    // 1. No signature has been loaded yet, OR
+    // 2. The XML document has changed since the last validation
+    //
+    // Special case: If a signature was manually loaded via loadSignature()
+    // but we haven't validated any document yet (this.signedXml is undefined),
+    // allow using that manually loaded signature for the first validation.
+    // This supports the pattern: loadSignature(node) -> checkSignature(xml)
+    // for documents with multiple signatures.
+    const hasValidatedBefore = this.signedXml !== undefined;
+    const xmlChanged = hasValidatedBefore && this.signedXml !== xml;
     const shouldReloadSignature = !this.signatureNode || xmlChanged;
 
     if (shouldReloadSignature) {
@@ -434,11 +443,20 @@ export class SignedXml {
   async checkSignatureAsync(xml: string): Promise<boolean> {
     const doc = new xmldom.DOMParser().parseFromString(xml);
 
-    // Check if we need to find and load the signature:
-    // 1. If no signature has been loaded yet, OR
-    // 2. If the XML document has changed from the last checkSignature* call
-    //    (we must reload to prevent stale signatures)
-    const xmlChanged = this.signedXml !== undefined && this.signedXml !== xml;
+    // Security: Prevent cross-document signature reuse attacks while supporting
+    // legitimate use of loadSignature() for documents with multiple signatures.
+    //
+    // Reload signature from the current document if:
+    // 1. No signature has been loaded yet, OR
+    // 2. The XML document has changed since the last validation
+    //
+    // Special case: If a signature was manually loaded via loadSignature()
+    // but we haven't validated any document yet (this.signedXml is undefined),
+    // allow using that manually loaded signature for the first validation.
+    // This supports the pattern: loadSignature(node) -> checkSignature(xml)
+    // for documents with multiple signatures.
+    const hasValidatedBefore = this.signedXml !== undefined;
+    const xmlChanged = hasValidatedBefore && this.signedXml !== xml;
     const shouldReloadSignature = !this.signatureNode || xmlChanged;
 
     if (shouldReloadSignature) {
@@ -1197,7 +1215,7 @@ export class SignedXml {
    *
    * @param xml The XML to compute the signature for.
    * @param opts An object containing options for the signature computation.
-   * @returns If no callback is provided, returns `this` (the instance of SignedXml).
+   * @returns void
    * @throws TypeError If the xml can not be parsed, or Error if there were invalid options passed.
    */
   computeSignature(xml: string, options: ComputeSignatureOptions): void;

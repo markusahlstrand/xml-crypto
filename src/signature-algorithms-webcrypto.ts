@@ -27,9 +27,13 @@ function isCryptoKey(key: unknown): key is CryptoKey {
 }
 
 /**
- * Check if a value is a Node.js Buffer (without using Buffer.isBuffer for browser compat)
+ * Check if a value is a Node.js Buffer without directly referencing the Buffer global.
+ * This is browser-safe: it never calls Buffer.isBuffer() or accesses the Buffer global,
+ * preventing ReferenceError in environments where Buffer is not defined.
+ * In browsers, this will always return false; in Node.js, it correctly identifies Buffers.
  */
 function isBuffer(value: unknown): value is Uint8Array {
+  // Safe: checks constructor name without accessing Buffer global
   return value instanceof Uint8Array && value.constructor.name === "Buffer";
 }
 
