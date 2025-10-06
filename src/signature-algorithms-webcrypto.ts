@@ -155,21 +155,16 @@ export class WebCryptoRsaSha1 implements SignatureAlgorithm {
       // If already a CryptoKey, use it directly
       let key: CryptoKey;
       if (isCryptoKey(privateKey)) {
-        key = privateKey;
-      } else {
-        // Normalize key (handles Buffer, KeyObject, etc.)
-        const normalizedKey = normalizeKey(privateKey);
-        if (typeof normalizedKey !== "string") {
-          throw new Error("RSA private keys must be in PEM format (string)");
-        }
-        key = await importRsaPrivateKey(normalizedKey, "SHA-1");
-      }
+      key = privateKey;
+    } else {
+      // Normalize key (handles Buffer, KeyObject, etc.)
+      const normalizedKey = normalizeKey(privateKey);
+      key = await importRsaPrivateKey(normalizedKey, "SHA-1");
+    }
 
-      const data = toArrayBuffer(signedInfo);
+    const data = toArrayBuffer(signedInfo);
 
-      const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, data);
-
-      return arrayBufferToBase64(signature);
+    const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, data);      return arrayBufferToBase64(signature);
     },
   );
 
@@ -178,20 +173,15 @@ export class WebCryptoRsaSha1 implements SignatureAlgorithm {
       // If already a CryptoKey, use it directly
       let publicKey: CryptoKey;
       if (isCryptoKey(key)) {
-        publicKey = key;
-      } else {
-        // Normalize key (handles Buffer, KeyObject, etc.)
-        const normalizedKey = normalizeKey(key);
-        if (typeof normalizedKey !== "string") {
-          throw new Error("RSA public keys must be in PEM format (string)");
-        }
-        publicKey = await importRsaPublicKey(normalizedKey, "SHA-1");
-      }
+      publicKey = key;
+    } else {
+      // Normalize key (handles Buffer, KeyObject, etc.)
+      const normalizedKey = normalizeKey(key);
+      publicKey = await importRsaPublicKey(normalizedKey, "SHA-1");
+    }
 
-      const data = new TextEncoder().encode(material);
-      const signature = base64ToArrayBuffer(signatureValue);
-
-      return await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, signature, data);
+    const data = new TextEncoder().encode(material);
+    const signature = base64ToArrayBuffer(signatureValue);      return await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, signature, data);
     },
   );
 
@@ -210,47 +200,37 @@ export class WebCryptoRsaSha256 implements SignatureAlgorithm {
       // If already a CryptoKey, use it directly
       let key: CryptoKey;
       if (isCryptoKey(privateKey)) {
-        key = privateKey;
-      } else {
-        // Normalize key (handles Buffer, KeyObject, etc.)
-        const normalizedKey = normalizeKey(privateKey);
-        if (typeof normalizedKey !== "string") {
-          throw new Error("RSA private keys must be in PEM format (string)");
-        }
-        key = await importRsaPrivateKey(normalizedKey, "SHA-256");
-      }
+      key = privateKey;
+    } else {
+      // Normalize key (handles Buffer, KeyObject, etc.)
+      const normalizedKey = normalizeKey(privateKey);
+      key = await importRsaPrivateKey(normalizedKey, "SHA-256");
+    }
 
-      const data = toArrayBuffer(signedInfo);
+    const data = toArrayBuffer(signedInfo);
 
-      const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, data);
+    const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, data);
 
-      return arrayBufferToBase64(signature);
-    },
-  );
-
-  verifySignature = createAsyncOptionalCallbackFunction(
+    return arrayBufferToBase64(signature);
+  },
+);  verifySignature = createAsyncOptionalCallbackFunction(
     async (material: string, key: unknown, signatureValue: string): Promise<boolean> => {
       // If already a CryptoKey, use it directly
       let publicKey: CryptoKey;
       if (isCryptoKey(key)) {
-        publicKey = key;
-      } else {
-        // Normalize key (handles Buffer, KeyObject, etc.)
-        const normalizedKey = normalizeKey(key);
-        if (typeof normalizedKey !== "string") {
-          throw new Error("RSA public keys must be in PEM format (string)");
-        }
-        publicKey = await importRsaPublicKey(normalizedKey, "SHA-256");
-      }
+      publicKey = key;
+    } else {
+      // Normalize key (handles Buffer, KeyObject, etc.)
+      const normalizedKey = normalizeKey(key);
+      publicKey = await importRsaPublicKey(normalizedKey, "SHA-256");
+    }
 
-      const data = new TextEncoder().encode(material);
-      const signature = base64ToArrayBuffer(signatureValue);
+    const data = new TextEncoder().encode(material);
+    const signature = base64ToArrayBuffer(signatureValue);
 
-      return await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, signature, data);
-    },
-  );
-
-  getAlgorithmName = (): string => {
+    return await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, signature, data);
+  },
+);  getAlgorithmName = (): string => {
     return "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256";
   };
 }
@@ -265,47 +245,37 @@ export class WebCryptoRsaSha512 implements SignatureAlgorithm {
       // If already a CryptoKey, use it directly
       let key: CryptoKey;
       if (isCryptoKey(privateKey)) {
-        key = privateKey;
-      } else {
-        // Normalize key (handles Buffer, KeyObject, etc.)
-        const normalizedKey = normalizeKey(privateKey);
-        if (typeof normalizedKey !== "string") {
-          throw new Error("RSA private keys must be in PEM format (string)");
-        }
-        key = await importRsaPrivateKey(normalizedKey, "SHA-512");
-      }
+      key = privateKey;
+    } else {
+      // Normalize key (handles Buffer, KeyObject, etc.)
+      const normalizedKey = normalizeKey(privateKey);
+      key = await importRsaPrivateKey(normalizedKey, "SHA-512");
+    }
 
-      const data = toArrayBuffer(signedInfo);
+    const data = toArrayBuffer(signedInfo);
 
-      const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, data);
+    const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, data);
 
-      return arrayBufferToBase64(signature);
-    },
-  );
-
-  verifySignature = createAsyncOptionalCallbackFunction(
+    return arrayBufferToBase64(signature);
+  },
+);  verifySignature = createAsyncOptionalCallbackFunction(
     async (material: string, key: unknown, signatureValue: string): Promise<boolean> => {
       // If already a CryptoKey, use it directly
       let publicKey: CryptoKey;
       if (isCryptoKey(key)) {
-        publicKey = key;
-      } else {
-        // Normalize key (handles Buffer, KeyObject, etc.)
-        const normalizedKey = normalizeKey(key);
-        if (typeof normalizedKey !== "string") {
-          throw new Error("RSA public keys must be in PEM format (string)");
-        }
-        publicKey = await importRsaPublicKey(normalizedKey, "SHA-512");
-      }
+      publicKey = key;
+    } else {
+      // Normalize key (handles Buffer, KeyObject, etc.)
+      const normalizedKey = normalizeKey(key);
+      publicKey = await importRsaPublicKey(normalizedKey, "SHA-512");
+    }
 
-      const data = new TextEncoder().encode(material);
-      const signature = base64ToArrayBuffer(signatureValue);
+    const data = new TextEncoder().encode(material);
+    const signature = base64ToArrayBuffer(signatureValue);
 
-      return await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, signature, data);
-    },
-  );
-
-  getAlgorithmName = (): string => {
+    return await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, signature, data);
+  },
+);  getAlgorithmName = (): string => {
     return "http://www.w3.org/2001/04/xmldsig-more#rsa-sha512";
   };
 }
