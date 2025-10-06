@@ -1,6 +1,6 @@
 import * as xpath from "xpath";
 import * as xmldom from "@xmldom/xmldom";
-import { SignedXml, createOptionalCallbackFunction } from "../src/index";
+import { SignedXml, createOptionalCallbackFunction, BinaryLike, KeyLike } from "../src/index";
 import * as fs from "fs";
 import * as crypto from "crypto";
 import { expect } from "chai";
@@ -704,10 +704,10 @@ describe("Signature unit tests", function () {
       };
 
       getSignature = createOptionalCallbackFunction(
-        (signedInfo: crypto.BinaryLike, privateKey: crypto.KeyLike) => {
+        (signedInfo: BinaryLike, privateKey: KeyLike) => {
           const signer = crypto.createSign("RSA-SHA1");
-          signer.update(signedInfo);
-          const res = signer.sign(privateKey, "base64");
+          signer.update(signedInfo as crypto.BinaryLike);
+          const res = signer.sign(privateKey as crypto.KeyLike, "base64");
           return res;
         },
       );

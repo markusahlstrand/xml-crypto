@@ -11,6 +11,12 @@ import * as crypto from "crypto";
 export type ErrorFirstCallback<T> = (err: Error | null, result?: T) => void;
 
 /**
+ * Binary data types that can be used for signing and verification.
+ * Compatible with both Node.js crypto and Web Crypto API.
+ */
+export type BinaryLike = string | ArrayBuffer | Buffer | Uint8Array;
+
+/**
  * Key types that can be used with xml-crypto.
  * Includes Node.js crypto.KeyLike (for Node.js crypto) and Web Crypto API CryptoKey.
  */
@@ -165,9 +171,9 @@ export interface SignatureAlgorithm {
   /**
    * Sign the given string using the given key
    */
-  getSignature(signedInfo: crypto.BinaryLike, privateKey: KeyLike): string | Promise<string>;
+  getSignature(signedInfo: BinaryLike, privateKey: KeyLike): string | Promise<string>;
   getSignature(
-    signedInfo: crypto.BinaryLike,
+    signedInfo: BinaryLike,
     privateKey: KeyLike,
     callback?: ErrorFirstCallback<string>,
   ): void;
