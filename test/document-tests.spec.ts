@@ -76,6 +76,41 @@ describe("Document tests", function () {
     });
   });
 
+  it("test checkSignature with callback handles invalid signature", function (done) {
+    // Load a document with an invalid signature (changed content)
+    const xml = fs.readFileSync("./test/static/invalid_signature - changed content.xml", "utf-8");
+    const sig = new SignedXml();
+    sig.publicCert = fs.readFileSync("./test/static/feide_public.pem");
+
+    sig.checkSignature(xml, (error, isValid) => {
+      // When signature is cryptographically invalid (references don't validate),
+      // the callback receives an error and isValid should be false.
+      expect(error).to.exist;
+      expect(error?.message).to.include("Could not validate all references");
+      expect(isValid).to.be.false;
+      expect(sig.getSignedReferences().length).to.equal(0);
+      done();
+    });
+  });
+
+  it("test checkSignature with callback handles invalid signature value", function (done) {
+    // Load a document with an invalid signature value (tampered SignatureValue)
+    const xml = fs.readFileSync("./test/static/invalid_signature - signature value.xml", "utf-8");
+    const sig = new SignedXml();
+    sig.publicCert = fs.readFileSync("./test/static/client_public.pem");
+
+    sig.checkSignature(xml, (error, isValid) => {
+      // When the signature value itself is incorrect (Stage B verification fails),
+      // the callback should receive both error and isValid === false for consistency
+      expect(error).to.exist;
+      expect(error?.message).to.include("invalid signature");
+      expect(error?.message).to.include("is incorrect");
+      expect(isValid).to.be.false;
+      expect(sig.getSignedReferences().length).to.equal(0);
+      done();
+    });
+  });
+
   it("should not reuse stale signature from previous checkSignature call", function () {
     const validXml = fs.readFileSync("./test/static/valid_signature.xml", "utf-8");
     const sig = new SignedXml();

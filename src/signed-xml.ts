@@ -484,6 +484,7 @@ export class SignedXml {
       if (callback) {
         callback(
           new Error(`invalid signature: the signature value ${this.signatureValue} is incorrect`),
+          false,
         );
         return; // return early
       } else {

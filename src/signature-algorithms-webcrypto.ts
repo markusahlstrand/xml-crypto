@@ -101,10 +101,17 @@ function normalizeKey(key: unknown): string | ArrayBuffer {
     } else if (keyObject.type === "secret") {
       // For secret keys (HMAC), export as buffer and preserve binary data
       const secretBuffer = keyObject.export();
-      // Convert to ArrayBuffer while preserving binary data
+      // Convert Node.js Buffer to ArrayBuffer properly
+      // Note: Buffer.buffer may be a pooled ArrayBuffer, so we need to copy the data
       const arrayBuffer = new ArrayBuffer(secretBuffer.byteLength);
       const view = new Uint8Array(arrayBuffer);
-      view.set(secretBuffer);
+      // Create a proper Uint8Array view of the Buffer to ensure compatibility
+      const bytes = new Uint8Array(
+        secretBuffer.buffer,
+        secretBuffer.byteOffset,
+        secretBuffer.byteLength,
+      );
+      view.set(bytes);
       return arrayBuffer;
     }
   }
@@ -114,7 +121,11 @@ function normalizeKey(key: unknown): string | ArrayBuffer {
 }
 
 /**
- * Convert various input types to ArrayBuffer for Web Crypto API
+ * Convert various input types to ArrayBuffer for Web Crypto API.
+ *
+ * BROWSER SAFETY: This function never references the global Buffer object directly.
+ * It uses the browser-safe isBuffer() helper which only checks constructor.name,
+ * preventing ReferenceError in environments where Buffer is not defined.
  */
 function toArrayBuffer(data: unknown): ArrayBuffer {
   if (typeof data === "string") {
@@ -123,6 +134,7 @@ function toArrayBuffer(data: unknown): ArrayBuffer {
   if (data instanceof ArrayBuffer) {
     return data;
   }
+  // Browser-safe: isBuffer() never calls Buffer.isBuffer() or accesses Buffer global
   if (data instanceof Uint8Array || isBuffer(data)) {
     // Create a new ArrayBuffer from the Uint8Array/Buffer
     const buffer = new ArrayBuffer((data as Uint8Array).byteLength);
