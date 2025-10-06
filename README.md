@@ -1,4 +1,6 @@
-# xml-crypto
+# xml-webcrypto
+
+> **Note:** This is a fork of [xml-crypto](https://github.com/node-saml/xml-crypto) that adds Web Crypto API support for use in modern browsers and environments without Node.js crypto dependencies. This fork will be discontinued if the upstream xml-crypto project adds native Web Crypto support.
 
 ![Build](https://github.com/node-saml/xml-crypto/actions/workflows/ci.yml/badge.svg)
 [![Gitpod Ready-to-Code](https://img.shields.io/badge/Gitpod-Ready--to--Code-blue?logo=gitpod)](https://gitpod.io/from-referrer/)
@@ -21,7 +23,7 @@ This will help prevent future XML signature wrapping attacks.
 Install with [npm](http://github.com/isaacs/npm):
 
 ```shell
-npm install xml-crypto
+npm install xml-webcrypto
 ```
 
 A pre requisite it to have [openssl](http://www.openssl.org/) installed and its /bin to be on the system path. I used version 1.0.1c but it should work on older versions too.
@@ -72,7 +74,7 @@ When signing a xml document you can pass the following options to the `SignedXml
 Use this code:
 
 ```javascript
-var SignedXml = require("xml-crypto").SignedXml,
+var SignedXml = require("xml-webcrypto").SignedXml,
   fs = require("fs");
 
 var xml = "<library>" + "<book>" + "<name>Harry Potter</name>" + "</book>" + "</library>";
@@ -162,9 +164,9 @@ npm install @xmldom/xmldom
 Example:
 
 ```javascript
-var select = require("xml-crypto").xpath,
+var select = require("xml-webcrypto").xpath,
   dom = require("@xmldom/xmldom").DOMParser,
-  SignedXml = require("xml-crypto").SignedXml,
+  SignedXml = require("xml-webcrypto").SignedXml,
   fs = require("fs");
 
 var xml = fs.readFileSync("signed.xml").toString();
@@ -296,7 +298,7 @@ The following sample shows how to sign a message using custom algorithms.
 First import some modules:
 
 ```javascript
-var SignedXml = require("xml-crypto").SignedXml,
+var SignedXml = require("xml-webcrypto").SignedXml,
   fs = require("fs");
 ```
 
@@ -487,7 +489,7 @@ Then you could use the result as is for the purpose of signing. For the purpose 
 Use the `prefix` option when calling `computeSignature` to add a prefix to the signature.
 
 ```javascript
-var SignedXml = require("xml-crypto").SignedXml,
+var SignedXml = require("xml-webcrypto").SignedXml,
   fs = require("fs");
 
 var xml = "<library>" + "<book>" + "<name>Harry Potter</name>" + "</book>" + "</library>";
@@ -516,7 +518,7 @@ Set `action` to one of the following:
 - after - append to specific node (use the `referenceNode` property)
 
 ```javascript
-var SignedXml = require("xml-crypto").SignedXml,
+var SignedXml = require("xml-webcrypto").SignedXml,
   fs = require("fs");
 
 var xml = "<library>" + "<book>" + "<name>Harry Potter</name>" + "</book>" + "</library>";

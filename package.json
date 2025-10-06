@@ -1,23 +1,26 @@
 {
-  "name": "xml-crypto",
+  "name": "xml-webcrypto",
   "version": "6.0.0",
   "private": false,
-  "description": "Xml digital signature and encryption library for Node.js",
+  "description": "Fork of xml-crypto with Web Crypto API support for xml digital signature and encryption",
   "keywords": [
     "xml",
     "digital signature",
     "xml encryption",
-    "x.509 certificate"
+    "x.509 certificate",
+    "webcrypto",
+    "web crypto api"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/node-saml/xml-crypto.git"
+    "url": "https://github.com/markusahlstrand/xml-crypto.git"
   },
   "license": "MIT",
   "author": "Yaron Naveh <yaronn01@gmail.com> (http://webservices20.blogspot.com/)",
   "contributors": [
     "LoneRifle <LoneRifle@users.noreply.github.com>",
-    "Chris Barth <chrisjbarth@hotmail.com>"
+    "Chris Barth <chrisjbarth@hotmail.com>",
+    "Markus Ahlstrand <markus.ahlstrand@gmail.com>"
   ],
   "main": "./lib",
   "files": [
