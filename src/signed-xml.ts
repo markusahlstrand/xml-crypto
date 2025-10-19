@@ -405,6 +405,13 @@ export class SignedXml {
 
     // (Stage B authentication step, show that the `signedInfoCanon` is signed)
 
+    // Use callback path if callback provided, otherwise use sync path
+    if (callback) {
+      this.verifySignatureValue(unverifiedSignedInfoCanon, callback);
+      return;
+    }
+
+    // Synchronous verification path
     // First find the key & signature algorithm, these should match
     // Stage B: Take the signature algorithm and key and verify the `SignatureValue` against the canonicalized `SignedInfo`
     const signer = this.findSignatureAlgorithm(this.signatureAlgorithm);
@@ -416,45 +423,15 @@ export class SignedXml {
     // Check the signature verification to know whether to reset signature value or not.
     const sigRes = signer.verifySignature(unverifiedSignedInfoCanon, key, this.signatureValue);
     
-    // Handle async algorithms (e.g., WebCrypto) by wrapping Promise in callback
+    // Handle async algorithms (e.g., WebCrypto) - require callback
     if (sigRes instanceof Promise) {
-      if (!callback) {
-        throw new Error(
-          "Async signature algorithms require a callback. Use checkSignature(xml, callback).",
-        );
-      }
-      sigRes
-        .then((isValid) => {
-          if (isValid) {
-            callback(null, true);
-          } else {
-            this.signedReferences = [];
-            this.references.forEach((ref) => {
-              ref.signedReference = undefined;
-            });
-            callback(
-              new Error(
-                `invalid signature: the signature value ${this.signatureValue} is incorrect`,
-              ),
-            );
-          }
-        })
-        .catch((err) => {
-          this.signedReferences = [];
-          this.references.forEach((ref) => {
-            ref.signedReference = undefined;
-          });
-          callback(err);
-        });
-      return; // Early return for async path
+      throw new Error(
+        "Async signature algorithms require a callback. Use checkSignature(xml, callback).",
+      );
     }
 
     if (sigRes === true) {
-      if (callback) {
-        callback(null, true);
-      } else {
-        return true;
-      }
+      return true;
     } else {
       // Ideally, we would start by verifying the `signedInfoCanon` first,
       // but that may cause some breaking changes, so we'll handle that in v7.x.
@@ -465,16 +442,9 @@ export class SignedXml {
       });
       // TODO: add this breaking change here later on for even more security: `this.references = [];`
 
-      if (callback) {
-        callback(
-          new Error(`invalid signature: the signature value ${this.signatureValue} is incorrect`),
-        );
-        return; // return early
-      } else {
-        throw new Error(
-          `invalid signature: the signature value ${this.signatureValue} is incorrect`,
-        );
-      }
+      throw new Error(
+        `invalid signature: the signature value ${this.signatureValue} is incorrect`,
+      );
     }
   }
 
@@ -1328,6 +1298,9 @@ export class SignedXml {
         const digestAlgorithm = this.findHashAlgorithm(ref.digestAlgorithm);
         const digest = digestAlgorithm.getHash(canonXml);
 
+        res += `</${prefix}Transforms>`;
+        res += `<${prefix}DigestMethod Algorithm="${digestAlgorithm.getAlgorithmName()}" />`;
+        
         // Check if digest is async
         if (digest instanceof Promise) {
           // Store promise with placeholder
@@ -1336,19 +1309,12 @@ export class SignedXml {
             index: placeholderIndex,
             promise: digest,
           });
-          res +=
-            `</${prefix}Transforms>` +
-            `<${prefix}DigestMethod Algorithm="${digestAlgorithm.getAlgorithmName()}" />` +
-            `<${prefix}DigestValue>__DIGEST_PLACEHOLDER_${placeholderIndex}__</${prefix}DigestValue>` +
-            `</${prefix}Reference>`;
+          res += `<${prefix}DigestValue>__DIGEST_PLACEHOLDER_${placeholderIndex}__</${prefix}DigestValue>`;
         } else {
-          res +=
-            `</${prefix}Transforms>` +
-            `<${prefix}DigestMethod Algorithm="${digestAlgorithm.getAlgorithmName()}" />` +
-            `<${prefix}DigestValue>${digest}</${prefix}DigestValue>` +
-            `</${prefix}Reference>`;
+          res += `<${prefix}DigestValue>${digest}</${prefix}DigestValue>`;
         }
-
+        
+        res += `</${prefix}Reference>`;
         refIndex++;
       }
     }
