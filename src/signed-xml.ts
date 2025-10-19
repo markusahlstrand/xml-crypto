@@ -312,8 +312,72 @@ export class SignedXml {
       this.loadReference(reference);
     }
 
-    /* eslint-disable-next-line deprecation/deprecation */
-    if (!this.getReferences().every((ref) => this.validateReference(ref, doc))) {
+    // Helper to validate all references (handles both sync and async hash algorithms)
+    const validateAllReferences = () => {
+      /* eslint-disable-next-line deprecation/deprecation */
+      const refs = this.getReferences();
+      const validationTasks: Array<boolean | Promise<boolean>> = [];
+      
+      for (const ref of refs) {
+        const result = this.validateReferenceInternal(ref, doc);
+        validationTasks.push(result);
+      }
+      
+      // Check if any tasks are async
+      const hasAsyncTasks = validationTasks.some((task) => task instanceof Promise);
+      
+      if (hasAsyncTasks) {
+        if (!callback) {
+          throw new Error(
+            "Async hash algorithms require using checkSignature() with a callback.",
+          );
+        }
+        
+        // Wait for all async validations to complete
+        // Wrap non-promises in Promise.resolve to normalize the array
+        const normalizedTasks = validationTasks.map((task) =>
+          task instanceof Promise ? task : Promise.resolve(task),
+        );
+        
+        return Promise.all(normalizedTasks).then((results) => {
+          return results.every((r) => r === true);
+        });
+      }
+      
+      // All synchronous
+      return validationTasks.every((r) => r === true);
+    };
+
+    const validationResultOrPromise = validateAllReferences();
+    
+    // Handle async validation
+    if (validationResultOrPromise instanceof Promise) {
+      validationResultOrPromise
+        .then((allValid) => {
+          if (!allValid) {
+            this.signedReferences = [];
+            this.references.forEach((ref) => {
+              ref.signedReference = undefined;
+            });
+            callback!(new Error("Could not validate all references"), false);
+            return;
+          }
+          
+          // Continue with signature verification
+          this.verifySignatureValue(unverifiedSignedInfoCanon, callback!);
+        })
+        .catch((err) => {
+          this.signedReferences = [];
+          this.references.forEach((ref) => {
+            ref.signedReference = undefined;
+          });
+          callback!(err, false);
+        });
+      return; // Early return for async path
+    }
+    
+    // Synchronous validation
+    if (!validationResultOrPromise) {
       /* Trustworthiness can only be determined if SignedInfo's (which holds References' DigestValue(s)
          which were validated at this stage) signature is valid. Execution does not proceed to validate
          signature phase thus each References' DigestValue must be considered to be untrusted (attacker
@@ -411,6 +475,59 @@ export class SignedXml {
           `invalid signature: the signature value ${this.signatureValue} is incorrect`,
         );
       }
+    }
+  }
+
+  private verifySignatureValue(
+    unverifiedSignedInfoCanon: string,
+    callback: (error: Error | null, isValid?: boolean) => void,
+  ): void {
+    const signer = this.findSignatureAlgorithm(this.signatureAlgorithm);
+    const key = this.getCertFromKeyInfo(this.keyInfo) || this.publicCert || this.privateKey;
+    if (key == null) {
+      throw new Error("KeyInfo or publicCert or privateKey is required to validate signature");
+    }
+
+    const sigRes = signer.verifySignature(unverifiedSignedInfoCanon, key, this.signatureValue);
+    
+    // Handle async algorithms (e.g., WebCrypto) by wrapping Promise in callback
+    if (sigRes instanceof Promise) {
+      sigRes
+        .then((isValid) => {
+          if (isValid) {
+            callback(null, true);
+          } else {
+            this.signedReferences = [];
+            this.references.forEach((ref) => {
+              ref.signedReference = undefined;
+            });
+            callback(
+              new Error(
+                `invalid signature: the signature value ${this.signatureValue} is incorrect`,
+              ),
+            );
+          }
+        })
+        .catch((err) => {
+          this.signedReferences = [];
+          this.references.forEach((ref) => {
+            ref.signedReference = undefined;
+          });
+          callback(err);
+        });
+      return;
+    }
+
+    if (sigRes === true) {
+      callback(null, true);
+    } else {
+      this.signedReferences = [];
+      this.references.forEach((ref) => {
+        ref.signedReference = undefined;
+      });
+      callback(
+        new Error(`invalid signature: the signature value ${this.signatureValue} is incorrect`),
+      );
     }
   }
 
@@ -557,7 +674,11 @@ export class SignedXml {
     throw new Error("No references passed validation");
   }
 
-  private validateReference(ref: Reference, doc: Document) {
+  private validateReferenceInternal(
+    ref: Reference,
+    doc: Document,
+    callback?: (error: Error | null, isValid?: boolean) => void,
+  ): boolean | Promise<boolean> {
     const uri = ref.uri?.[0] === "#" ? ref.uri.substring(1) : ref.uri;
     let elem: xpath.SelectSingleReturnType = null;
 
@@ -609,11 +730,24 @@ export class SignedXml {
     const hash = this.findHashAlgorithm(ref.digestAlgorithm);
     const digest = hash.getHash(canonXml);
 
-    // Detect async hash algorithms
+    // Detect async hash algorithms - return Promise for parent to handle
     if (digest instanceof Promise) {
-      throw new Error(
-        "Async hash algorithms require using checkSignature() with a callback.",
-      );
+      return digest.then((computedDigest) => {
+        if (!utils.validateDigestValue(computedDigest, ref.digestValue)) {
+          const validationError = new Error(
+            `invalid signature: for uri ${ref.uri} calculated digest is ${computedDigest} but the xml to validate supplies digest ${ref.digestValue}`,
+          );
+          ref.validationError = validationError;
+          return false;
+        }
+        // This step can only be done after we have verified the `signedInfo`.
+        // We verified that they have same hash,
+        // thus the `canonXml` and _only_ the `canonXml` can be trusted.
+        // Append this to `signedReferences`.
+        this.signedReferences.push(canonXml);
+        ref.signedReference = canonXml;
+        return true;
+      });
     }
 
     if (!utils.validateDigestValue(digest, ref.digestValue)) {
@@ -1008,95 +1142,121 @@ export class SignedXml {
     // add the xml namespace attribute
     signatureAttrs.push(`${xmlNsAttr}="http://www.w3.org/2000/09/xmldsig#"`);
 
-    let signatureXml = `<${currentPrefix}Signature ${signatureAttrs.join(" ")}>`;
+    const signedInfoOrPromise = this.createSignedInfo(doc, prefix);
+    
+    // Helper to continue signature creation after SignedInfo is ready
+    const continueWithSignature = (signedInfoXml: string) => {
+      let signatureXml = `<${currentPrefix}Signature ${signatureAttrs.join(" ")}>`;
+      signatureXml += signedInfoXml;
+      signatureXml += this.getKeyInfo(prefix);
+      signatureXml += `</${currentPrefix}Signature>`;
 
-    signatureXml += this.createSignedInfo(doc, prefix);
-    signatureXml += this.getKeyInfo(prefix);
-    signatureXml += `</${currentPrefix}Signature>`;
+      this.originalXmlWithIds = doc.toString();
 
-    this.originalXmlWithIds = doc.toString();
-
-    let existingPrefixesString = "";
-    Object.keys(existingPrefixes).forEach(function (key) {
-      existingPrefixesString += `xmlns:${key}="${existingPrefixes[key]}" `;
-    });
-
-    // A trick to remove the namespaces that already exist in the xml
-    // This only works if the prefix and namespace match with those in the xml
-    const dummySignatureWrapper = `<Dummy ${existingPrefixesString}>${signatureXml}</Dummy>`;
-    const nodeXml = new xmldom.DOMParser().parseFromString(dummySignatureWrapper);
-
-    // Because we are using a dummy wrapper hack described above, we know there will be a `firstChild`
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const signatureDoc = nodeXml.documentElement.firstChild!;
-
-    const referenceNode = xpath.select1(location.reference, doc);
-
-    if (!isDomNode.isNodeLike(referenceNode)) {
-      const err2 = new Error(
-        `the following xpath cannot be used because it was not found: ${location.reference}`,
-      );
-      if (!callback) {
-        throw err2;
-      } else {
-        callback(err2);
-        return;
-      }
-    }
-
-    if (location.action === "append") {
-      referenceNode.appendChild(signatureDoc);
-    } else if (location.action === "prepend") {
-      referenceNode.insertBefore(signatureDoc, referenceNode.firstChild);
-    } else if (location.action === "before") {
-      if (referenceNode.parentNode == null) {
-        throw new Error(
-          "`location.reference` refers to the root node (by default), so we can't insert `before`",
-        );
-      }
-      referenceNode.parentNode.insertBefore(signatureDoc, referenceNode);
-    } else if (location.action === "after") {
-      if (referenceNode.parentNode == null) {
-        throw new Error(
-          "`location.reference` refers to the root node (by default), so we can't insert `after`",
-        );
-      }
-      referenceNode.parentNode.insertBefore(signatureDoc, referenceNode.nextSibling);
-    }
-
-    this.signatureNode = signatureDoc;
-    const signedInfoNodes = utils.findChildren(this.signatureNode, "SignedInfo");
-    if (signedInfoNodes.length === 0) {
-      const err3 = new Error("could not find SignedInfo element in the message");
-      if (!callback) {
-        throw err3;
-      } else {
-        callback(err3);
-        return;
-      }
-    }
-    const signedInfoNode = signedInfoNodes[0];
-
-    if (typeof callback === "function") {
-      // Asynchronous flow
-      this.calculateSignatureValue(doc, (err, signature) => {
-        if (err) {
-          callback(err);
-        } else {
-          this.signatureValue = signature || "";
-          signatureDoc.insertBefore(this.createSignature(prefix), signedInfoNode.nextSibling);
-          this.signatureXml = signatureDoc.toString();
-          this.signedXml = doc.toString();
-          callback(null, this);
-        }
+      let existingPrefixesString = "";
+      Object.keys(existingPrefixes).forEach(function (key) {
+        existingPrefixesString += `xmlns:${key}="${existingPrefixes[key]}" `;
       });
-    } else {
-      // Synchronous flow
-      this.calculateSignatureValue(doc);
-      signatureDoc.insertBefore(this.createSignature(prefix), signedInfoNode.nextSibling);
-      this.signatureXml = signatureDoc.toString();
-      this.signedXml = doc.toString();
+
+      // A trick to remove the namespaces that already exist in the xml
+      // This only works if the prefix and namespace match with those in the xml
+      const dummySignatureWrapper = `<Dummy ${existingPrefixesString}>${signatureXml}</Dummy>`;
+      const nodeXml = new xmldom.DOMParser().parseFromString(dummySignatureWrapper);
+
+      // Because we are using a dummy wrapper hack described above, we know there will be a `firstChild`
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const signatureDoc = nodeXml.documentElement.firstChild!;
+
+      // We default location.reference above, so we know it exists
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const referenceNode = xpath.select1(location.reference!, doc);
+
+      if (!isDomNode.isNodeLike(referenceNode)) {
+        const err2 = new Error(
+          `the following xpath cannot be used because it was not found: ${location.reference}`,
+        );
+        if (!callback) {
+          throw err2;
+        } else {
+          callback(err2);
+          return;
+        }
+      }
+
+      if (location.action === "append") {
+        referenceNode.appendChild(signatureDoc);
+      } else if (location.action === "prepend") {
+        referenceNode.insertBefore(signatureDoc, referenceNode.firstChild);
+      } else if (location.action === "before") {
+        if (referenceNode.parentNode == null) {
+          throw new Error(
+            "`location.reference` refers to the root node (by default), so we can't insert `before`",
+          );
+        }
+        referenceNode.parentNode.insertBefore(signatureDoc, referenceNode);
+      } else if (location.action === "after") {
+        if (referenceNode.parentNode == null) {
+          throw new Error(
+            "`location.reference` refers to the root node (by default), so we can't insert `after`",
+          );
+        }
+        referenceNode.parentNode.insertBefore(signatureDoc, referenceNode.nextSibling);
+      }
+
+      this.signatureNode = signatureDoc;
+      const signedInfoNodes = utils.findChildren(this.signatureNode, "SignedInfo");
+      if (signedInfoNodes.length === 0) {
+        const err3 = new Error("could not find SignedInfo element in the message");
+        if (!callback) {
+          throw err3;
+        } else {
+          callback(err3);
+          return;
+        }
+      }
+      const signedInfoNode = signedInfoNodes[0];
+
+      if (typeof callback === "function") {
+        // Asynchronous flow
+        this.calculateSignatureValue(doc, (err, signature) => {
+          if (err) {
+            callback(err);
+          } else {
+            this.signatureValue = signature || "";
+            signatureDoc.insertBefore(this.createSignature(prefix), signedInfoNode.nextSibling);
+            this.signatureXml = signatureDoc.toString();
+            this.signedXml = doc.toString();
+            callback(null, this);
+          }
+        });
+      } else {
+        // Synchronous flow
+        this.calculateSignatureValue(doc);
+        signatureDoc.insertBefore(this.createSignature(prefix), signedInfoNode.nextSibling);
+        this.signatureXml = signatureDoc.toString();
+        this.signedXml = doc.toString();
+      }
+    };
+
+    // Handle async SignedInfo creation
+    if (signedInfoOrPromise instanceof Promise) {
+      if (!callback) {
+        throw new Error(
+          "Async hash algorithms require a callback. Use computeSignature(xml, options, callback).",
+        );
+      }
+      signedInfoOrPromise
+        .then((signedInfoXml) => {
+          continueWithSignature(signedInfoXml);
+        })
+        .catch((err) => {
+          callback(err);
+        });
+      return; // Early return for async path
     }
+
+    // Synchronous path
+    continueWithSignature(signedInfoOrPromise);
   }
 
   private getKeyInfo(prefix) {
@@ -1121,11 +1281,14 @@ export class SignedXml {
    * Generate the Reference nodes (as part of the signature process)
    *
    */
-  private createReferences(doc, prefix) {
+  private createReferences(doc, prefix): string | Promise<string> {
     let res = "";
 
     prefix = prefix || "";
     prefix = prefix ? `${prefix}:` : prefix;
+
+    const digestPromises: Array<{ index: number; promise: Promise<string> }> = [];
+    let refIndex = 0;
 
     /* eslint-disable-next-line deprecation/deprecation */
     for (const ref of this.getReferences()) {
@@ -1163,12 +1326,45 @@ export class SignedXml {
         const canonXml = this.getCanonReferenceXml(doc, ref, node);
 
         const digestAlgorithm = this.findHashAlgorithm(ref.digestAlgorithm);
-        res +=
-          `</${prefix}Transforms>` +
-          `<${prefix}DigestMethod Algorithm="${digestAlgorithm.getAlgorithmName()}" />` +
-          `<${prefix}DigestValue>${digestAlgorithm.getHash(canonXml)}</${prefix}DigestValue>` +
-          `</${prefix}Reference>`;
+        const digest = digestAlgorithm.getHash(canonXml);
+
+        // Check if digest is async
+        if (digest instanceof Promise) {
+          // Store promise with placeholder
+          const placeholderIndex = refIndex;
+          digestPromises.push({
+            index: placeholderIndex,
+            promise: digest,
+          });
+          res +=
+            `</${prefix}Transforms>` +
+            `<${prefix}DigestMethod Algorithm="${digestAlgorithm.getAlgorithmName()}" />` +
+            `<${prefix}DigestValue>__DIGEST_PLACEHOLDER_${placeholderIndex}__</${prefix}DigestValue>` +
+            `</${prefix}Reference>`;
+        } else {
+          res +=
+            `</${prefix}Transforms>` +
+            `<${prefix}DigestMethod Algorithm="${digestAlgorithm.getAlgorithmName()}" />` +
+            `<${prefix}DigestValue>${digest}</${prefix}DigestValue>` +
+            `</${prefix}Reference>`;
+        }
+
+        refIndex++;
       }
+    }
+
+    // If we have async digests, wait for them and replace placeholders
+    if (digestPromises.length > 0) {
+      return Promise.all(digestPromises.map((d) => d.promise)).then((resolvedDigests) => {
+        let result = res;
+        digestPromises.forEach((d, idx) => {
+          result = result.replace(
+            `__DIGEST_PLACEHOLDER_${d.index}__`,
+            resolvedDigests[idx],
+          );
+        });
+        return result;
+      });
     }
 
     return res;
@@ -1252,7 +1448,7 @@ export class SignedXml {
    * Create the SignedInfo element
    *
    */
-  private createSignedInfo(doc, prefix) {
+  private createSignedInfo(doc, prefix): string | Promise<string> {
     if (typeof this.canonicalizationAlgorithm !== "string") {
       throw new Error(
         "Missing canonicalizationAlgorithm when trying to create signed info for XML",
@@ -1278,7 +1474,16 @@ export class SignedXml {
     }
     res += `<${currentPrefix}SignatureMethod Algorithm="${algo.getAlgorithmName()}" />`;
 
-    res += this.createReferences(doc, prefix);
+    const referencesOrPromise = this.createReferences(doc, prefix);
+    
+    // Handle async references
+    if (referencesOrPromise instanceof Promise) {
+      return referencesOrPromise.then((references) => {
+        return res + references + `</${currentPrefix}SignedInfo>`;
+      });
+    }
+    
+    res += referencesOrPromise;
     res += `</${currentPrefix}SignedInfo>`;
     return res;
   }

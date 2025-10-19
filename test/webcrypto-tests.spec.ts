@@ -9,6 +9,7 @@ import {
 import { importRsaPrivateKey, importRsaPublicKey } from "../src/webcrypto-utils";
 import { expect } from "chai";
 import { readFileSync } from "fs";
+import * as xmldom from "@xmldom/xmldom";
 
 describe("WebCrypto Hash Algorithms", function () {
   it("WebCryptoSha1 should compute hash correctly", async function () {
@@ -271,6 +272,11 @@ describe("WebCrypto XML Signing and Verification", function () {
         verifier.SignatureAlgorithms["http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"] =
           WebCryptoRsaSha256;
 
+        // Load signature from the signed XML
+        const doc = new xmldom.DOMParser().parseFromString(signedXml);
+        const signature = verifier.findSignatures(doc)[0];
+        verifier.loadSignature(signature);
+
         verifier.checkSignature(signedXml, (error, isValid) => {
           if (error) {
             return done(error);
@@ -319,6 +325,11 @@ describe("WebCrypto XML Signing and Verification", function () {
         verifier.HashAlgorithms["http://www.w3.org/2000/09/xmldsig#sha1"] = WebCryptoSha1;
         verifier.SignatureAlgorithms["http://www.w3.org/2000/09/xmldsig#rsa-sha1"] =
           WebCryptoRsaSha1;
+
+        // Load signature from the signed XML
+        const doc = new xmldom.DOMParser().parseFromString(signedXml);
+        const signature = verifier.findSignatures(doc)[0];
+        verifier.loadSignature(signature);
 
         verifier.checkSignature(signedXml, (error, isValid) => {
           if (error) {
@@ -373,6 +384,11 @@ describe("WebCrypto XML Signing and Verification", function () {
         verifier.SignatureAlgorithms["http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"] =
           WebCryptoRsaSha256;
 
+        // Load signature from the signed XML
+        const doc = new xmldom.DOMParser().parseFromString(signedXml);
+        const signature = verifier.findSignatures(doc)[0];
+        verifier.loadSignature(signature);
+
         verifier.checkSignature(signedXml, (error, isValid) => {
           expect(error).to.exist;
           expect(error?.message).to.include("Could not validate all references");
@@ -403,8 +419,9 @@ describe("WebCrypto XML Signing and Verification", function () {
       WebCryptoRsaSha256;
 
     // Should throw when using sync method with async algorithm
+    // Hash computation happens first, so we get hash algorithm error
     expect(() => sig.computeSignature(xml)).to.throw(
-      "Async signature algorithms cannot be used with sync methods",
+      "Async hash algorithms require a callback",
     );
   });
 
@@ -446,9 +463,15 @@ describe("WebCrypto XML Signing and Verification", function () {
         verifier.SignatureAlgorithms["http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"] =
           WebCryptoRsaSha256;
 
+        // Load signature first
+        const doc = new xmldom.DOMParser().parseFromString(signedXml);
+        const signature = verifier.findSignatures(doc)[0];
+        verifier.loadSignature(signature);
+
         // Should throw when using sync method with async algorithm for verification
+        // Hash validation happens first, so we get hash algorithm error
         expect(() => verifier.checkSignature(signedXml)).to.throw(
-          "Async signature algorithms require a callback",
+          "Async hash algorithms require using checkSignature() with a callback",
         );
         done();
       }).catch(done);
@@ -500,6 +523,11 @@ describe("WebCrypto XML Signing and Verification", function () {
         verifier.SignatureAlgorithms["http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"] =
           WebCryptoRsaSha256;
 
+        // Load signature from the signed XML
+        const doc = new xmldom.DOMParser().parseFromString(signedXml);
+        const signature = verifier.findSignatures(doc)[0];
+        verifier.loadSignature(signature);
+
         verifier.checkSignature(signedXml, (error, isValid) => {
           if (error) {
             return done(error);
@@ -546,6 +574,11 @@ describe("WebCrypto HMAC XML Signing", function () {
       verifier.HashAlgorithms["http://www.w3.org/2000/09/xmldsig#sha1"] = WebCryptoSha1;
       verifier.SignatureAlgorithms["http://www.w3.org/2000/09/xmldsig#hmac-sha1"] =
         WebCryptoHmacSha1;
+
+      // Load signature from the signed XML
+      const doc = new xmldom.DOMParser().parseFromString(signedXml);
+      const signature = verifier.findSignatures(doc)[0];
+      verifier.loadSignature(signature);
 
       verifier.checkSignature(signedXml, (error, isValid) => {
         if (error) {
