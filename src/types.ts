@@ -259,30 +259,3 @@ export function createOptionalCallbackFunction<T, A extends unknown[]>(
     (...args: [...A, ErrorFirstCallback<T>]): void;
   };
 }
-
-/**
- * This function will add a callback version of an async function.
- *
- * This follows the factory pattern.
- * Just call this function, passing the async function that you'd like to add a callback version of.
- */
-export function createAsyncOptionalCallbackFunction<T, A extends unknown[]>(
-  asyncVersion: (...args: A) => Promise<T>,
-): {
-  (...args: A): Promise<T>;
-  (...args: [...A, ErrorFirstCallback<T>]): void;
-} {
-  return ((...args: A | [...A, ErrorFirstCallback<T>]) => {
-    const possibleCallback = args[args.length - 1];
-    if (isErrorFirstCallback(possibleCallback)) {
-      asyncVersion(...(args.slice(0, -1) as A))
-        .then((result) => possibleCallback(null, result))
-        .catch((err) => possibleCallback(err instanceof Error ? err : new Error("Unknown error")));
-    } else {
-      return asyncVersion(...(args as A));
-    }
-  }) as {
-    (...args: A): Promise<T>;
-    (...args: [...A, ErrorFirstCallback<T>]): void;
-  };
-}
