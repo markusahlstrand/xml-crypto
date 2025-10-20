@@ -1022,28 +1022,22 @@ export class SignedXml {
       },
     };
 
-    // Helper to handle errors for both sync and async modes
-    const handleError = (err: Error) => {
-      if (callback) {
-        callback(err);
-      } else {
-        throw err;
-      }
-    };
-
     // defaults to the root node
     location.reference = location.reference || "/*";
     // defaults to append action
     location.action = location.action || "append";
 
     if (validActions.indexOf(location.action) === -1) {
-      handleError(
-        new Error(
-          `location.action option has an invalid action: ${
-            location.action
-          }, must be any of the following values: ${validActions.join(", ")}`,
-        ),
+      const err = new Error(
+        `location.action option has an invalid action: ${
+          location.action
+        }, must be any of the following values: ${validActions.join(", ")}`,
       );
+      if (callback) {
+        callback(err);
+      } else {
+        throw err;
+      }
       return;
     }
 
@@ -1064,78 +1058,83 @@ export class SignedXml {
     // add the xml namespace attribute
     signatureAttrs.push(`${xmlNsAttr}="http://www.w3.org/2000/09/xmldsig#"`);
 
-    // Step 1: Create SignedInfo (sync or async depending on callback)
-    const processSignedInfo = (signedInfoXml: string) => {
-      // Build the signature XML
-      let signatureXml = `<${currentPrefix}Signature ${signatureAttrs.join(" ")}>`;
-      signatureXml += signedInfoXml;
-      signatureXml += this.getKeyInfo(prefix);
-      signatureXml += `</${currentPrefix}Signature>`;
+    // Start the process: create SignedInfo (sync or async)
+    if (callback) {
+      // Async mode
+      this.createSignedInfo(doc, prefix, (err, signedInfoXml) => {
+        if (err) {
+          callback(err);
+          return;
+        }
 
-      this.originalXmlWithIds = doc.toString();
+        // Build the signature XML
+        let signatureXml = `<${currentPrefix}Signature ${signatureAttrs.join(" ")}>`;
+        signatureXml += signedInfoXml;
+        signatureXml += this.getKeyInfo(prefix);
+        signatureXml += `</${currentPrefix}Signature>`;
 
-      let existingPrefixesString = "";
-      Object.keys(existingPrefixes).forEach(function (key) {
-        existingPrefixesString += `xmlns:${key}="${existingPrefixes[key]}" `;
-      });
+        this.originalXmlWithIds = doc.toString();
 
-      // A trick to remove the namespaces that already exist in the xml
-      // This only works if the prefix and namespace match with those in the xml
-      const dummySignatureWrapper = `<Dummy ${existingPrefixesString}>${signatureXml}</Dummy>`;
-      const nodeXml = new xmldom.DOMParser().parseFromString(dummySignatureWrapper);
+        let existingPrefixesString = "";
+        Object.keys(existingPrefixes).forEach(function (key) {
+          existingPrefixesString += `xmlns:${key}="${existingPrefixes[key]}" `;
+        });
 
-      // Because we are using a dummy wrapper hack described above, we know there will be a `firstChild`
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const signatureDoc = nodeXml.documentElement.firstChild!;
+        // A trick to remove the namespaces that already exist in the xml
+        // This only works if the prefix and namespace match with those in the xml
+        const dummySignatureWrapper = `<Dummy ${existingPrefixesString}>${signatureXml}</Dummy>`;
+        const nodeXml = new xmldom.DOMParser().parseFromString(dummySignatureWrapper);
 
-      const referenceNode = xpath.select1(location.reference!, doc);
+        // Because we are using a dummy wrapper hack described above, we know there will be a `firstChild`
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        const signatureDoc = nodeXml.documentElement.firstChild!;
 
-      if (!isDomNode.isNodeLike(referenceNode)) {
-        handleError(
-          new Error(
-            `the following xpath cannot be used because it was not found: ${location.reference}`,
-          ),
-        );
-        return;
-      }
+        const referenceNode = xpath.select1(location.reference!, doc);
 
-      if (location.action === "append") {
-        referenceNode.appendChild(signatureDoc);
-      } else if (location.action === "prepend") {
-        referenceNode.insertBefore(signatureDoc, referenceNode.firstChild);
-      } else if (location.action === "before") {
-        if (referenceNode.parentNode == null) {
-          handleError(
+        if (!isDomNode.isNodeLike(referenceNode)) {
+          callback(
             new Error(
-              "`location.reference` refers to the root node (by default), so we can't insert `before`",
+              `the following xpath cannot be used because it was not found: ${location.reference}`,
             ),
           );
           return;
         }
-        referenceNode.parentNode.insertBefore(signatureDoc, referenceNode);
-      } else if (location.action === "after") {
-        if (referenceNode.parentNode == null) {
-          handleError(
-            new Error(
-              "`location.reference` refers to the root node (by default), so we can't insert `after`",
-            ),
-          );
+
+        if (location.action === "append") {
+          referenceNode.appendChild(signatureDoc);
+        } else if (location.action === "prepend") {
+          referenceNode.insertBefore(signatureDoc, referenceNode.firstChild);
+        } else if (location.action === "before") {
+          if (referenceNode.parentNode == null) {
+            callback(
+              new Error(
+                "`location.reference` refers to the root node (by default), so we can't insert `before`",
+              ),
+            );
+            return;
+          }
+          referenceNode.parentNode.insertBefore(signatureDoc, referenceNode);
+        } else if (location.action === "after") {
+          if (referenceNode.parentNode == null) {
+            callback(
+              new Error(
+                "`location.reference` refers to the root node (by default), so we can't insert `after`",
+              ),
+            );
+            return;
+          }
+          referenceNode.parentNode.insertBefore(signatureDoc, referenceNode.nextSibling);
+        }
+
+        this.signatureNode = signatureDoc;
+        const signedInfoNodes = utils.findChildren(this.signatureNode, "SignedInfo");
+        if (signedInfoNodes.length === 0) {
+          callback(new Error("could not find SignedInfo element in the message"));
           return;
         }
-        referenceNode.parentNode.insertBefore(signatureDoc, referenceNode.nextSibling);
-      }
+        const signedInfoNode = signedInfoNodes[0];
 
-      this.signatureNode = signatureDoc;
-      const signedInfoNodes = utils.findChildren(this.signatureNode, "SignedInfo");
-      if (signedInfoNodes.length === 0) {
-        handleError(new Error("could not find SignedInfo element in the message"));
-        return;
-      }
-      const signedInfoNode = signedInfoNodes[0];
-
-      // Step 2: Calculate signature value (sync or async)
-      if (callback) {
-        // Async mode
+        // Calculate signature value asynchronously
         this.calculateSignatureValue(doc, (err, signature) => {
           if (err) {
             callback(err);
@@ -1147,31 +1146,75 @@ export class SignedXml {
             callback(null, this);
           }
         });
-      } else {
-        // Sync mode
-        this.calculateSignatureValue(doc);
-        signatureDoc.insertBefore(this.createSignature(prefix), signedInfoNode.nextSibling);
-        this.signatureXml = signatureDoc.toString();
-        this.signedXml = doc.toString();
-      }
-    };
-
-    // Start the process: create SignedInfo (sync or async)
-    if (callback) {
-      // Async mode
-      this.createSignedInfo(doc, prefix, (err, signedInfoXml) => {
-        if (err) {
-          callback(err);
-        } else {
-          processSignedInfo(signedInfoXml!);
-        }
       });
       return;
-    } else {
-      // Sync mode
-      const signedInfoXml = this.createSignedInfo(doc, prefix) as string;
-      processSignedInfo(signedInfoXml);
     }
+
+    // Sync mode
+    const signedInfoXml = this.createSignedInfo(doc, prefix) as string;
+
+    // Build the signature XML
+    let signatureXml = `<${currentPrefix}Signature ${signatureAttrs.join(" ")}>`;
+    signatureXml += signedInfoXml;
+    signatureXml += this.getKeyInfo(prefix);
+    signatureXml += `</${currentPrefix}Signature>`;
+
+    this.originalXmlWithIds = doc.toString();
+
+    let existingPrefixesString = "";
+    Object.keys(existingPrefixes).forEach(function (key) {
+      existingPrefixesString += `xmlns:${key}="${existingPrefixes[key]}" `;
+    });
+
+    // A trick to remove the namespaces that already exist in the xml
+    // This only works if the prefix and namespace match with those in the xml
+    const dummySignatureWrapper = `<Dummy ${existingPrefixesString}>${signatureXml}</Dummy>`;
+    const nodeXml = new xmldom.DOMParser().parseFromString(dummySignatureWrapper);
+
+    // Because we are using a dummy wrapper hack described above, we know there will be a `firstChild`
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const signatureDoc = nodeXml.documentElement.firstChild!;
+
+    const referenceNode = xpath.select1(location.reference!, doc);
+
+    if (!isDomNode.isNodeLike(referenceNode)) {
+      throw new Error(
+        `the following xpath cannot be used because it was not found: ${location.reference}`,
+      );
+    }
+
+    if (location.action === "append") {
+      referenceNode.appendChild(signatureDoc);
+    } else if (location.action === "prepend") {
+      referenceNode.insertBefore(signatureDoc, referenceNode.firstChild);
+    } else if (location.action === "before") {
+      if (referenceNode.parentNode == null) {
+        throw new Error(
+          "`location.reference` refers to the root node (by default), so we can't insert `before`",
+        );
+      }
+      referenceNode.parentNode.insertBefore(signatureDoc, referenceNode);
+    } else if (location.action === "after") {
+      if (referenceNode.parentNode == null) {
+        throw new Error(
+          "`location.reference` refers to the root node (by default), so we can't insert `after`",
+        );
+      }
+      referenceNode.parentNode.insertBefore(signatureDoc, referenceNode.nextSibling);
+    }
+
+    this.signatureNode = signatureDoc;
+    const signedInfoNodes = utils.findChildren(this.signatureNode, "SignedInfo");
+    if (signedInfoNodes.length === 0) {
+      throw new Error("could not find SignedInfo element in the message");
+    }
+    const signedInfoNode = signedInfoNodes[0];
+
+    // Calculate signature value synchronously
+    this.calculateSignatureValue(doc);
+    signatureDoc.insertBefore(this.createSignature(prefix), signedInfoNode.nextSibling);
+    this.signatureXml = signatureDoc.toString();
+    this.signedXml = doc.toString();
   }
 
   private getKeyInfo(prefix) {
