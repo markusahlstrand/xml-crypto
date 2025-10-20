@@ -314,17 +314,10 @@ export class SignedXml {
 
     // Use callback-based validation if callback provided
     if (callback) {
-      /* eslint-disable-next-line deprecation/deprecation */
-      const refs = this.getReferences();
       let completed = 0;
       let hasError = false;
 
-      if (refs.length === 0) {
-        this.verifySignatureValue(unverifiedSignedInfoCanon, callback);
-        return;
-      }
-
-      refs.forEach((ref) => {
+      this.references.forEach((ref) => {
         this.validateReference(ref, doc, (err, isValid) => {
           if (hasError) return; // Already failed
 
@@ -339,7 +332,7 @@ export class SignedXml {
           }
 
           completed++;
-          if (completed === refs.length) {
+          if (completed === this.references.length) {
             // Continue with signature verification
             this.verifySignatureValue(unverifiedSignedInfoCanon, callback);
           }
@@ -349,8 +342,7 @@ export class SignedXml {
     }
 
     // Synchronous validation (for Node.js crypto algorithms)
-    /* eslint-disable-next-line deprecation/deprecation */
-    if (!this.getReferences().every((ref) => this.validateReference(ref, doc))) {
+    if (!this.references.every((ref) => this.validateReference(ref, doc))) {
       /* Trustworthiness can only be determined if SignedInfo's (which holds References' DigestValue(s)
          which were validated at this stage) signature is valid. Execution does not proceed to validate
          signature phase thus each References' DigestValue must be considered to be untrusted (attacker
@@ -372,13 +364,6 @@ export class SignedXml {
     }
 
     // (Stage B authentication step, show that the `signedInfoCanon` is signed)
-
-    // Use callback path if callback provided, otherwise use sync path
-    if (callback) {
-      this.verifySignatureValue(unverifiedSignedInfoCanon, callback);
-      return;
-    }
-
     // Synchronous verification path
     // First find the key & signature algorithm, these should match
     // Stage B: Take the signature algorithm and key and verify the `SignatureValue` against the canonicalized `SignedInfo`
@@ -555,8 +540,7 @@ export class SignedXml {
       elem = elemOrXpath;
     }
 
-    /* eslint-disable-next-line deprecation/deprecation */
-    for (const ref of this.getReferences()) {
+    for (const ref of this.references) {
       const uri = ref.uri?.[0] === "#" ? ref.uri.substring(1) : ref.uri;
 
       for (const attr of this.idAttributes) {
@@ -579,7 +563,7 @@ export class SignedXml {
     throw new Error("No references passed validation");
   }
 
-  private validateReference(ref: Reference, doc: Document): boolean;
+  private validateReference(ref: Reference, doc: Document);
   private validateReference(
     ref: Reference,
     doc: Document,
@@ -1038,23 +1022,29 @@ export class SignedXml {
       },
     };
 
+    // Helper to handle errors for both sync and async modes
+    const handleError = (err: Error) => {
+      if (callback) {
+        callback(err);
+      } else {
+        throw err;
+      }
+    };
+
     // defaults to the root node
     location.reference = location.reference || "/*";
     // defaults to append action
     location.action = location.action || "append";
 
     if (validActions.indexOf(location.action) === -1) {
-      const err = new Error(
-        `location.action option has an invalid action: ${
-          location.action
-        }, must be any of the following values: ${validActions.join(", ")}`,
+      handleError(
+        new Error(
+          `location.action option has an invalid action: ${
+            location.action
+          }, must be any of the following values: ${validActions.join(", ")}`,
+        ),
       );
-      if (!callback) {
-        throw err;
-      } else {
-        callback(err);
-        return;
-      }
+      return;
     }
 
     // automatic insertion of `:`
@@ -1073,15 +1063,6 @@ export class SignedXml {
 
     // add the xml namespace attribute
     signatureAttrs.push(`${xmlNsAttr}="http://www.w3.org/2000/09/xmldsig#"`);
-
-    // Helper to handle errors for both sync and async modes
-    const handleError = (err: Error) => {
-      if (callback) {
-        callback(err);
-      } else {
-        throw err;
-      }
-    };
 
     // Step 1: Create SignedInfo (sync or async depending on callback)
     const processSignedInfo = (signedInfoXml: string) => {
@@ -1229,8 +1210,7 @@ export class SignedXml {
     prefix = prefix || "";
     prefix = prefix ? `${prefix}:` : prefix;
 
-    /* eslint-disable-next-line deprecation/deprecation */
-    const refs = this.getReferences();
+    const refs = this.references;
     const referenceXmls: string[] = [];
     let totalNodes = 0;
     let completed = 0;
