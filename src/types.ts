@@ -14,7 +14,7 @@ export type ErrorFirstCallback<T> = (err: Error | null, result?: T) => void;
  * Binary data types that can be used for signing and verification.
  * Compatible with both Node.js crypto and Web Crypto API.
  */
-export type BinaryLike = string | ArrayBuffer | Buffer | Uint8Array;
+export type BinaryLike = crypto.BinaryLike | ArrayBuffer;
 
 /**
  * Key types that can be used with xml-crypto.

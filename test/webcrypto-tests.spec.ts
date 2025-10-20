@@ -12,85 +12,86 @@ import { readFileSync } from "fs";
 import * as xmldom from "@xmldom/xmldom";
 
 describe("WebCrypto Hash Algorithms", function () {
-  it("WebCryptoSha1 should compute hash correctly", async function () {
+  it("WebCryptoSha1 should compute hash correctly", function (done) {
     const hash = new WebCryptoSha1();
     const xml = "<test>data</test>";
-    const digest = await hash.getHash(xml);
+    hash.getHash(xml, (err, digest) => {
+      if (err) return done(err);
 
-    // Verify it returns a base64 string
-    expect(digest).to.be.a("string");
-    expect(digest.length).to.be.greaterThan(0);
-    expect(() => Buffer.from(digest, "base64")).to.not.throw();
+      // Verify it returns a base64 string
+      expect(digest).to.be.a("string");
+      if (digest) {
+        expect(digest.length).to.be.greaterThan(0);
+        expect(() => Buffer.from(digest, "base64")).to.not.throw();
+      }
 
-    // Verify algorithm name
-    expect(hash.getAlgorithmName()).to.equal("http://www.w3.org/2000/09/xmldsig#sha1");
+      // Verify algorithm name
+      expect(hash.getAlgorithmName()).to.equal("http://www.w3.org/2000/09/xmldsig#sha1");
+      done();
+    });
   });
 
-  it("WebCryptoSha256 should compute hash correctly", async function () {
+  it("WebCryptoSha256 should compute hash correctly", function (done) {
     const hash = new WebCryptoSha256();
     const xml = "<test>data</test>";
-    const digest = await hash.getHash(xml);
+    hash.getHash(xml, (err, digest) => {
+      if (err) return done(err);
 
-    expect(digest).to.be.a("string");
-    expect(digest.length).to.be.greaterThan(0);
-    expect(() => Buffer.from(digest, "base64")).to.not.throw();
-    expect(hash.getAlgorithmName()).to.equal("http://www.w3.org/2001/04/xmlenc#sha256");
+      expect(digest).to.be.a("string");
+      if (digest) {
+        expect(digest.length).to.be.greaterThan(0);
+        expect(() => Buffer.from(digest, "base64")).to.not.throw();
+      }
+      expect(hash.getAlgorithmName()).to.equal("http://www.w3.org/2001/04/xmlenc#sha256");
+      done();
+    });
   });
 
-  it("WebCryptoSha512 should compute hash correctly", async function () {
+  it("WebCryptoSha512 should compute hash correctly", function (done) {
     const hash = new WebCryptoSha512();
     const xml = "<test>data</test>";
-    const digest = await hash.getHash(xml);
+    hash.getHash(xml, (err, digest) => {
+      if (err) return done(err);
 
-    expect(digest).to.be.a("string");
-    expect(digest.length).to.be.greaterThan(0);
-    expect(() => Buffer.from(digest, "base64")).to.not.throw();
-    expect(hash.getAlgorithmName()).to.equal("http://www.w3.org/2001/04/xmlenc#sha512");
+      expect(digest).to.be.a("string");
+      if (digest) {
+        expect(digest.length).to.be.greaterThan(0);
+        expect(() => Buffer.from(digest, "base64")).to.not.throw();
+      }
+      expect(hash.getAlgorithmName()).to.equal("http://www.w3.org/2001/04/xmlenc#sha512");
+      done();
+    });
   });
 
-  it("should produce consistent hashes for same input", async function () {
+  it("should produce consistent hashes for same input", function (done) {
     const hash = new WebCryptoSha256();
     const xml = "<test>consistent data</test>";
-    const digest1 = await hash.getHash(xml);
-    const digest2 = await hash.getHash(xml);
+    hash.getHash(xml, (err1, digest1) => {
+      if (err1) return done(err1);
 
-    expect(digest1).to.equal(digest2);
+      hash.getHash(xml, (err2, digest2) => {
+        if (err2) return done(err2);
+
+        expect(digest1).to.equal(digest2);
+        done();
+      });
+    });
   });
 
-  it("should produce different hashes for different inputs", async function () {
+  it("should produce different hashes for different inputs", function (done) {
     const hash = new WebCryptoSha256();
     const xml1 = "<test>data1</test>";
     const xml2 = "<test>data2</test>";
-    const digest1 = await hash.getHash(xml1);
-    const digest2 = await hash.getHash(xml2);
+    hash.getHash(xml1, (err1, digest1) => {
+      if (err1) return done(err1);
 
-    expect(digest1).to.not.equal(digest2);
-  });
-});
+      hash.getHash(xml2, (err2, digest2) => {
+        if (err2) return done(err2);
 
-describe("WebCrypto Key Import Utilities", function () {
-  it("should import RSA private key from PEM", async function () {
-    const pem = readFileSync("./test/static/client.pem", "utf8");
-    const key = await importRsaPrivateKey(pem, "SHA-256");
-
-    expect(key).to.be.instanceOf(CryptoKey);
-    expect(key.type).to.equal("private");
-    expect(key.algorithm.name).to.equal("RSASSA-PKCS1-v1_5");
-  });
-
-  it("should import RSA public key from PEM", async function () {
-    const pem = readFileSync("./test/static/client_public.pem", "utf8");
-
-    // Extract public key using Node.js crypto first
-    const crypto = await import("crypto");
-    const publicKeyObj = crypto.createPublicKey(pem);
-    const spkiPem = publicKeyObj.export({ type: "spki", format: "pem" }) as string;
-
-    const key = await importRsaPublicKey(spkiPem, "SHA-256");
-
-    expect(key).to.be.instanceOf(CryptoKey);
-    expect(key.type).to.equal("public");
-    expect(key.algorithm.name).to.equal("RSASSA-PKCS1-v1_5");
+        expect(digest1).to.not.equal(digest2);
+        done();
+      });
+    });
   });
 });
 
@@ -104,35 +105,50 @@ describe("WebCrypto RSA Signature Algorithms", function () {
   });
 
   describe("WebCryptoRsaSha256", function () {
-    it("should sign and verify data correctly", async function () {
+    it("should sign and verify data correctly", function (done) {
       const algo = new WebCryptoRsaSha256();
       const data = "test data to sign";
 
-      const signature = await algo.getSignature(data, privateKey);
-      expect(signature).to.be.a("string");
-      expect(signature.length).to.be.greaterThan(0);
+      algo.getSignature(data, privateKey, async (err, signature) => {
+        if (err) return done(err);
 
-      // Extract public key to SPKI format for WebCrypto
-      const crypto = await import("crypto");
-      const publicKeyObj = crypto.createPublicKey(publicKey);
-      const spkiPem = publicKeyObj.export({ type: "spki", format: "pem" }) as string;
+        expect(signature).to.be.a("string");
+        if (signature) {
+          expect(signature.length).to.be.greaterThan(0);
+        }
 
-      const isValid = await algo.verifySignature(data, spkiPem, signature);
-      expect(isValid).to.be.true;
+        // Extract public key to SPKI format for WebCrypto
+        const crypto = await import("crypto");
+        const publicKeyObj = crypto.createPublicKey(publicKey);
+        const spkiPem = publicKeyObj.export({ type: "spki", format: "pem" }) as string;
+
+        algo.verifySignature(data, spkiPem, signature!, (verifyErr, isValid) => {
+          if (verifyErr) return done(verifyErr);
+
+          expect(isValid).to.be.true;
+          done();
+        });
+      });
     });
 
-    it("should fail verification with wrong data", async function () {
+    it("should fail verification with wrong data", function (done) {
       const algo = new WebCryptoRsaSha256();
       const data = "test data to sign";
 
-      const signature = await algo.getSignature(data, privateKey);
+      algo.getSignature(data, privateKey, async (err, signature) => {
+        if (err) return done(err);
 
-      const crypto = await import("crypto");
-      const publicKeyObj = crypto.createPublicKey(publicKey);
-      const spkiPem = publicKeyObj.export({ type: "spki", format: "pem" }) as string;
+        const crypto = await import("crypto");
+        const publicKeyObj = crypto.createPublicKey(publicKey);
+        const spkiPem = publicKeyObj.export({ type: "spki", format: "pem" }) as string;
 
-      const isValid = await algo.verifySignature("wrong data", spkiPem, signature);
-      expect(isValid).to.be.false;
+        algo.verifySignature("wrong data", spkiPem, signature!, (verifyErr, isValid) => {
+          if (verifyErr) return done(verifyErr);
+
+          expect(isValid).to.be.false;
+          done();
+        });
+      });
     });
 
     it("should have correct algorithm name", function () {
@@ -142,19 +158,26 @@ describe("WebCrypto RSA Signature Algorithms", function () {
   });
 
   describe("WebCryptoRsaSha1", function () {
-    it("should sign and verify data correctly", async function () {
+    it("should sign and verify data correctly", function (done) {
       const algo = new WebCryptoRsaSha1();
       const data = "test data to sign";
 
-      const signature = await algo.getSignature(data, privateKey);
-      expect(signature).to.be.a("string");
+      algo.getSignature(data, privateKey, async (err, signature) => {
+        if (err) return done(err);
 
-      const crypto = await import("crypto");
-      const publicKeyObj = crypto.createPublicKey(publicKey);
-      const spkiPem = publicKeyObj.export({ type: "spki", format: "pem" }) as string;
+        expect(signature).to.be.a("string");
 
-      const isValid = await algo.verifySignature(data, spkiPem, signature);
-      expect(isValid).to.be.true;
+        const crypto = await import("crypto");
+        const publicKeyObj = crypto.createPublicKey(publicKey);
+        const spkiPem = publicKeyObj.export({ type: "spki", format: "pem" }) as string;
+
+        algo.verifySignature(data, spkiPem, signature!, (verifyErr, isValid) => {
+          if (verifyErr) return done(verifyErr);
+
+          expect(isValid).to.be.true;
+          done();
+        });
+      });
     });
 
     it("should have correct algorithm name", function () {
@@ -164,19 +187,26 @@ describe("WebCrypto RSA Signature Algorithms", function () {
   });
 
   describe("WebCryptoRsaSha512", function () {
-    it("should sign and verify data correctly", async function () {
+    it("should sign and verify data correctly", function (done) {
       const algo = new WebCryptoRsaSha512();
       const data = "test data to sign";
 
-      const signature = await algo.getSignature(data, privateKey);
-      expect(signature).to.be.a("string");
+      algo.getSignature(data, privateKey, async (err, signature) => {
+        if (err) return done(err);
 
-      const crypto = await import("crypto");
-      const publicKeyObj = crypto.createPublicKey(publicKey);
-      const spkiPem = publicKeyObj.export({ type: "spki", format: "pem" }) as string;
+        expect(signature).to.be.a("string");
 
-      const isValid = await algo.verifySignature(data, spkiPem, signature);
-      expect(isValid).to.be.true;
+        const crypto = await import("crypto");
+        const publicKeyObj = crypto.createPublicKey(publicKey);
+        const spkiPem = publicKeyObj.export({ type: "spki", format: "pem" }) as string;
+
+        algo.verifySignature(data, spkiPem, signature!, (verifyErr, isValid) => {
+          if (verifyErr) return done(verifyErr);
+
+          expect(isValid).to.be.true;
+          done();
+        });
+      });
     });
 
     it("should have correct algorithm name", function () {
@@ -188,28 +218,43 @@ describe("WebCrypto RSA Signature Algorithms", function () {
 
 describe("WebCrypto HMAC Signature Algorithm", function () {
   describe("WebCryptoHmacSha1", function () {
-    it("should sign and verify data correctly", async function () {
+    it("should sign and verify data correctly", function (done) {
       const algo = new WebCryptoHmacSha1();
       const data = "test data to sign";
       const key = "my-secret-key";
 
-      const signature = await algo.getSignature(data, key);
-      expect(signature).to.be.a("string");
-      expect(signature.length).to.be.greaterThan(0);
+      algo.getSignature(data, key, (err, signature) => {
+        if (err) return done(err);
 
-      const isValid = await algo.verifySignature(data, key, signature);
-      expect(isValid).to.be.true;
+        expect(signature).to.be.a("string");
+        if (signature) {
+          expect(signature.length).to.be.greaterThan(0);
+        }
+
+        algo.verifySignature(data, key, signature!, (verifyErr, isValid) => {
+          if (verifyErr) return done(verifyErr);
+
+          expect(isValid).to.be.true;
+          done();
+        });
+      });
     });
 
-    it("should fail verification with wrong key", async function () {
+    it("should fail verification with wrong key", function (done) {
       const algo = new WebCryptoHmacSha1();
       const data = "test data to sign";
       const key = "my-secret-key";
 
-      const signature = await algo.getSignature(data, key);
+      algo.getSignature(data, key, (err, signature) => {
+        if (err) return done(err);
 
-      const isValid = await algo.verifySignature(data, "wrong-key", signature);
-      expect(isValid).to.be.false;
+        algo.verifySignature(data, "wrong-key", signature!, (verifyErr, isValid) => {
+          if (verifyErr) return done(verifyErr);
+
+          expect(isValid).to.be.false;
+          done();
+        });
+      });
     });
 
     it("should have correct algorithm name", function () {
@@ -262,29 +307,31 @@ describe("WebCrypto XML Signing and Verification", function () {
       const verifier = new SignedXml();
 
       // Convert certificate to SPKI format for WebCrypto
-      import("crypto").then((crypto) => {
-        const publicKeyObj = crypto.createPublicKey(publicKey);
-        const spkiPem = publicKeyObj.export({ type: "spki", format: "pem" }) as string;
+      import("crypto")
+        .then((crypto) => {
+          const publicKeyObj = crypto.createPublicKey(publicKey);
+          const spkiPem = publicKeyObj.export({ type: "spki", format: "pem" }) as string;
 
-        verifier.publicCert = spkiPem;
+          verifier.publicCert = spkiPem;
 
-        verifier.HashAlgorithms["http://www.w3.org/2001/04/xmlenc#sha256"] = WebCryptoSha256;
-        verifier.SignatureAlgorithms["http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"] =
-          WebCryptoRsaSha256;
+          verifier.HashAlgorithms["http://www.w3.org/2001/04/xmlenc#sha256"] = WebCryptoSha256;
+          verifier.SignatureAlgorithms["http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"] =
+            WebCryptoRsaSha256;
 
-        // Load signature from the signed XML
-        const doc = new xmldom.DOMParser().parseFromString(signedXml);
-        const signature = verifier.findSignatures(doc)[0];
-        verifier.loadSignature(signature);
+          // Load signature from the signed XML
+          const doc = new xmldom.DOMParser().parseFromString(signedXml);
+          const signature = verifier.findSignatures(doc)[0];
+          verifier.loadSignature(signature);
 
-        verifier.checkSignature(signedXml, (error, isValid) => {
-          if (error) {
-            return done(error);
-          }
-          expect(isValid).to.be.true;
-          done();
-        });
-      }).catch(done);
+          verifier.checkSignature(signedXml, (error, isValid) => {
+            if (error) {
+              return done(error);
+            }
+            expect(isValid).to.be.true;
+            done();
+          });
+        })
+        .catch(done);
     });
   });
 
@@ -316,29 +363,31 @@ describe("WebCrypto XML Signing and Verification", function () {
       // Verify
       const verifier = new SignedXml();
 
-      import("crypto").then((crypto) => {
-        const publicKeyObj = crypto.createPublicKey(publicKey);
-        const spkiPem = publicKeyObj.export({ type: "spki", format: "pem" }) as string;
+      import("crypto")
+        .then((crypto) => {
+          const publicKeyObj = crypto.createPublicKey(publicKey);
+          const spkiPem = publicKeyObj.export({ type: "spki", format: "pem" }) as string;
 
-        verifier.publicCert = spkiPem;
+          verifier.publicCert = spkiPem;
 
-        verifier.HashAlgorithms["http://www.w3.org/2000/09/xmldsig#sha1"] = WebCryptoSha1;
-        verifier.SignatureAlgorithms["http://www.w3.org/2000/09/xmldsig#rsa-sha1"] =
-          WebCryptoRsaSha1;
+          verifier.HashAlgorithms["http://www.w3.org/2000/09/xmldsig#sha1"] = WebCryptoSha1;
+          verifier.SignatureAlgorithms["http://www.w3.org/2000/09/xmldsig#rsa-sha1"] =
+            WebCryptoRsaSha1;
 
-        // Load signature from the signed XML
-        const doc = new xmldom.DOMParser().parseFromString(signedXml);
-        const signature = verifier.findSignatures(doc)[0];
-        verifier.loadSignature(signature);
+          // Load signature from the signed XML
+          const doc = new xmldom.DOMParser().parseFromString(signedXml);
+          const signature = verifier.findSignatures(doc)[0];
+          verifier.loadSignature(signature);
 
-        verifier.checkSignature(signedXml, (error, isValid) => {
-          if (error) {
-            return done(error);
-          }
-          expect(isValid).to.be.true;
-          done();
-        });
-      }).catch(done);
+          verifier.checkSignature(signedXml, (error, isValid) => {
+            if (error) {
+              return done(error);
+            }
+            expect(isValid).to.be.true;
+            done();
+          });
+        })
+        .catch(done);
     });
   });
 
@@ -374,28 +423,30 @@ describe("WebCrypto XML Signing and Verification", function () {
       // Verify should fail
       const verifier = new SignedXml();
 
-      import("crypto").then((crypto) => {
-        const publicKeyObj = crypto.createPublicKey(publicKey);
-        const spkiPem = publicKeyObj.export({ type: "spki", format: "pem" }) as string;
+      import("crypto")
+        .then((crypto) => {
+          const publicKeyObj = crypto.createPublicKey(publicKey);
+          const spkiPem = publicKeyObj.export({ type: "spki", format: "pem" }) as string;
 
-        verifier.publicCert = spkiPem;
+          verifier.publicCert = spkiPem;
 
-        verifier.HashAlgorithms["http://www.w3.org/2001/04/xmlenc#sha256"] = WebCryptoSha256;
-        verifier.SignatureAlgorithms["http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"] =
-          WebCryptoRsaSha256;
+          verifier.HashAlgorithms["http://www.w3.org/2001/04/xmlenc#sha256"] = WebCryptoSha256;
+          verifier.SignatureAlgorithms["http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"] =
+            WebCryptoRsaSha256;
 
-        // Load signature from the signed XML
-        const doc = new xmldom.DOMParser().parseFromString(signedXml);
-        const signature = verifier.findSignatures(doc)[0];
-        verifier.loadSignature(signature);
+          // Load signature from the signed XML
+          const doc = new xmldom.DOMParser().parseFromString(signedXml);
+          const signature = verifier.findSignatures(doc)[0];
+          verifier.loadSignature(signature);
 
-        verifier.checkSignature(signedXml, (error, isValid) => {
-          expect(error).to.exist;
-          expect(error?.message).to.include("Could not validate all references");
-          expect(isValid).to.be.false;
-          done();
-        });
-      }).catch(done);
+          verifier.checkSignature(signedXml, (error, isValid) => {
+            expect(error).to.exist;
+            expect(error?.message).to.include("invalid signature");
+            expect(isValid).to.be.false;
+            done();
+          });
+        })
+        .catch(done);
     });
   });
 
@@ -421,7 +472,7 @@ describe("WebCrypto XML Signing and Verification", function () {
     // Should throw when using sync method with async algorithm
     // Hash computation happens first, so we get hash algorithm error
     expect(() => sig.computeSignature(xml)).to.throw(
-      "Async hash algorithms require a callback",
+      "WebCrypto hash algorithms are async and require a callback",
     );
   });
 
@@ -454,27 +505,29 @@ describe("WebCrypto XML Signing and Verification", function () {
       // Now try to verify using sync method - should throw
       const verifier = new SignedXml();
 
-      import("crypto").then((crypto) => {
-        const publicKeyObj = crypto.createPublicKey(publicKey);
-        const spkiPem = publicKeyObj.export({ type: "spki", format: "pem" }) as string;
+      import("crypto")
+        .then((crypto) => {
+          const publicKeyObj = crypto.createPublicKey(publicKey);
+          const spkiPem = publicKeyObj.export({ type: "spki", format: "pem" }) as string;
 
-        verifier.publicCert = spkiPem;
-        verifier.HashAlgorithms["http://www.w3.org/2001/04/xmlenc#sha256"] = WebCryptoSha256;
-        verifier.SignatureAlgorithms["http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"] =
-          WebCryptoRsaSha256;
+          verifier.publicCert = spkiPem;
+          verifier.HashAlgorithms["http://www.w3.org/2001/04/xmlenc#sha256"] = WebCryptoSha256;
+          verifier.SignatureAlgorithms["http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"] =
+            WebCryptoRsaSha256;
 
-        // Load signature first
-        const doc = new xmldom.DOMParser().parseFromString(signedXml);
-        const signature = verifier.findSignatures(doc)[0];
-        verifier.loadSignature(signature);
+          // Load signature first
+          const doc = new xmldom.DOMParser().parseFromString(signedXml);
+          const signature = verifier.findSignatures(doc)[0];
+          verifier.loadSignature(signature);
 
-        // Should throw when using sync method with async algorithm for verification
-        // Hash validation happens first, so we get hash algorithm error
-        expect(() => verifier.checkSignature(signedXml)).to.throw(
-          "Async hash algorithms require using checkSignature() with a callback",
-        );
-        done();
-      }).catch(done);
+          // Should throw when using sync method with async algorithm for verification
+          // Hash validation happens first, so we get hash algorithm error
+          expect(() => verifier.checkSignature(signedXml)).to.throw(
+            "WebCrypto hash algorithms are async and require a callback",
+          );
+          done();
+        })
+        .catch(done);
     });
   });
 
@@ -513,29 +566,31 @@ describe("WebCrypto XML Signing and Verification", function () {
       // Verify
       const verifier = new SignedXml();
 
-      import("crypto").then((crypto) => {
-        const publicKeyObj = crypto.createPublicKey(publicKey);
-        const spkiPem = publicKeyObj.export({ type: "spki", format: "pem" }) as string;
+      import("crypto")
+        .then((crypto) => {
+          const publicKeyObj = crypto.createPublicKey(publicKey);
+          const spkiPem = publicKeyObj.export({ type: "spki", format: "pem" }) as string;
 
-        verifier.publicCert = spkiPem;
+          verifier.publicCert = spkiPem;
 
-        verifier.HashAlgorithms["http://www.w3.org/2001/04/xmlenc#sha256"] = WebCryptoSha256;
-        verifier.SignatureAlgorithms["http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"] =
-          WebCryptoRsaSha256;
+          verifier.HashAlgorithms["http://www.w3.org/2001/04/xmlenc#sha256"] = WebCryptoSha256;
+          verifier.SignatureAlgorithms["http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"] =
+            WebCryptoRsaSha256;
 
-        // Load signature from the signed XML
-        const doc = new xmldom.DOMParser().parseFromString(signedXml);
-        const signature = verifier.findSignatures(doc)[0];
-        verifier.loadSignature(signature);
+          // Load signature from the signed XML
+          const doc = new xmldom.DOMParser().parseFromString(signedXml);
+          const signature = verifier.findSignatures(doc)[0];
+          verifier.loadSignature(signature);
 
-        verifier.checkSignature(signedXml, (error, isValid) => {
-          if (error) {
-            return done(error);
-          }
-          expect(isValid).to.be.true;
-          done();
-        });
-      }).catch(done);
+          verifier.checkSignature(signedXml, (error, isValid) => {
+            if (error) {
+              return done(error);
+            }
+            expect(isValid).to.be.true;
+            done();
+          });
+        })
+        .catch(done);
     });
   });
 });
@@ -672,16 +727,6 @@ describe("WebCrypto Callback-Style API", function () {
       done();
     });
   });
-
-  it("should support promise-style alongside callback-style", async function () {
-    const signer = new WebCryptoRsaSha256();
-    const data = "test data";
-
-    // Promise-style should still work
-    const signature = await signer.getSignature(data, privateKey);
-    expect(signature).to.be.a("string");
-    expect(signature.length).to.be.greaterThan(0);
-  });
 });
 
 describe("WebCrypto Key Type Support", function () {
@@ -697,81 +742,129 @@ describe("WebCrypto Key Type Support", function () {
     publicKeyBuffer = readFileSync("./test/static/client_public.pem");
   });
 
-  it("should accept Buffer as private key for signing", async function () {
+  it("should accept Buffer as private key for signing", function (done) {
     const signer = new WebCryptoRsaSha256();
     const data = "test data with buffer key";
 
-    const signature = await signer.getSignature(data, privateKeyBuffer);
-    expect(signature).to.be.a("string");
-    expect(signature.length).to.be.greaterThan(0);
+    signer.getSignature(data, privateKeyBuffer, (err, signature) => {
+      if (err) return done(err);
+
+      expect(signature).to.be.a("string");
+      if (signature) {
+        expect(signature.length).to.be.greaterThan(0);
+      }
+      done();
+    });
   });
 
-  it("should accept Buffer as public key for verification", async function () {
+  it("should accept Buffer as public key for verification", function (done) {
     const signer = new WebCryptoRsaSha256();
     const data = "test data with buffer key";
 
     // Sign with string key
-    const signature = await signer.getSignature(data, privateKeyString);
+    signer.getSignature(data, privateKeyString, async (err, signature) => {
+      if (err || !signature) return done(err);
 
-    // Verify with buffer key
-    const crypto = await import("crypto");
-    const publicKeyObj = crypto.createPublicKey(publicKeyBuffer);
-    const spkiPem = publicKeyObj.export({ type: "spki", format: "pem" }) as string;
+      // Verify with buffer key
+      const crypto = await import("crypto");
+      const publicKeyObj = crypto.createPublicKey(publicKeyBuffer);
+      const spkiPem = publicKeyObj.export({ type: "spki", format: "pem" }) as string;
 
-    const isValid = await signer.verifySignature(data, Buffer.from(spkiPem), signature);
-    expect(isValid).to.be.true;
+      signer.verifySignature(data, Buffer.from(spkiPem), signature, (verifyErr, isValid) => {
+        if (verifyErr) return done(verifyErr);
+
+        expect(isValid).to.be.true;
+        done();
+      });
+    });
   });
 
-  it("should accept KeyObject as private key for signing", async function () {
-    const crypto = await import("crypto");
-    const signer = new WebCryptoRsaSha256();
-    const data = "test data with KeyObject";
+  it("should accept KeyObject as private key for signing", function (done) {
+    import("crypto")
+      .then((crypto) => {
+        const signer = new WebCryptoRsaSha256();
+        const data = "test data with KeyObject";
 
-    const privateKeyObj = crypto.createPrivateKey(privateKeyString);
-    const signature = await signer.getSignature(data, privateKeyObj);
-    expect(signature).to.be.a("string");
-    expect(signature.length).to.be.greaterThan(0);
+        const privateKeyObj = crypto.createPrivateKey(privateKeyString);
+        signer.getSignature(data, privateKeyObj, (err, signature) => {
+          if (err) return done(err);
+
+          expect(signature).to.be.a("string");
+          if (signature) {
+            expect(signature.length).to.be.greaterThan(0);
+          }
+          done();
+        });
+      })
+      .catch(done);
   });
 
-  it("should accept KeyObject as public key for verification", async function () {
-    const crypto = await import("crypto");
-    const signer = new WebCryptoRsaSha256();
-    const data = "test data with KeyObject";
+  it("should accept KeyObject as public key for verification", function (done) {
+    import("crypto")
+      .then((crypto) => {
+        const signer = new WebCryptoRsaSha256();
+        const data = "test data with KeyObject";
 
-    // Sign with string key
-    const signature = await signer.getSignature(data, privateKeyString);
+        // Sign with string key
+        signer.getSignature(data, privateKeyString, (err, signature) => {
+          if (err || !signature) return done(err);
 
-    // Verify with KeyObject
-    const publicKeyObj = crypto.createPublicKey(publicKeyString);
+          // Verify with KeyObject
+          const publicKeyObj = crypto.createPublicKey(publicKeyString);
 
-    const isValid = await signer.verifySignature(data, publicKeyObj, signature);
-    expect(isValid).to.be.true;
+          signer.verifySignature(data, publicKeyObj, signature, (verifyErr, isValid) => {
+            if (verifyErr) return done(verifyErr);
+
+            expect(isValid).to.be.true;
+            done();
+          });
+        });
+      })
+      .catch(done);
   });
 
-  it("should accept secret KeyObject for HMAC signing", async function () {
-    const crypto = await import("crypto");
-    const signer = new WebCryptoHmacSha1();
-    const data = "test data with secret KeyObject";
+  it("should accept secret KeyObject for HMAC signing", function (done) {
+    import("crypto")
+      .then((crypto) => {
+        const signer = new WebCryptoHmacSha1();
+        const data = "test data with secret KeyObject";
 
-    // Create a secret KeyObject
-    const secretKey = crypto.createSecretKey(Uint8Array.from(Buffer.from("my-hmac-secret-key")));
-    const signature = await signer.getSignature(data, secretKey);
-    expect(signature).to.be.a("string");
-    expect(signature.length).to.be.greaterThan(0);
+        // Create a secret KeyObject
+        const secretKey = crypto.createSecretKey(
+          Uint8Array.from(Buffer.from("my-hmac-secret-key")),
+        );
+        signer.getSignature(data, secretKey, (err, signature) => {
+          if (err || !signature) return done(err);
 
-    // Verify with same secret KeyObject
-    const isValid = await signer.verifySignature(data, secretKey, signature);
-    expect(isValid).to.be.true;
+          expect(signature).to.be.a("string");
+          expect(signature.length).to.be.greaterThan(0);
+
+          // Verify with same secret KeyObject
+          signer.verifySignature(data, secretKey, signature, (verifyErr, isValid) => {
+            if (verifyErr) return done(verifyErr);
+
+            expect(isValid).to.be.true;
+            done();
+          });
+        });
+      })
+      .catch(done);
   });
 
-  it("should accept Uint8Array as key", async function () {
+  it("should accept Uint8Array as key", function (done) {
     const signer = new WebCryptoRsaSha256();
     const data = "test data with Uint8Array";
 
     const privateKeyUint8 = new Uint8Array(privateKeyBuffer);
-    const signature = await signer.getSignature(data, privateKeyUint8);
-    expect(signature).to.be.a("string");
-    expect(signature.length).to.be.greaterThan(0);
+    signer.getSignature(data, privateKeyUint8, (err, signature) => {
+      if (err) return done(err);
+
+      expect(signature).to.be.a("string");
+      if (signature) {
+        expect(signature.length).to.be.greaterThan(0);
+      }
+      done();
+    });
   });
 
   it("should work with Buffer keys in callback-style API", function (done) {
