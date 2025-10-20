@@ -342,7 +342,8 @@ export class SignedXml {
     }
 
     // Synchronous validation (for Node.js crypto algorithms)
-    if (!this.references.every((ref) => this.validateReference(ref, doc))) {
+    /* eslint-disable-next-line deprecation/deprecation */
+    if (!this.getReferences().every((ref) => this.validateReference(ref, doc))) {
       /* Trustworthiness can only be determined if SignedInfo's (which holds References' DigestValue(s)
          which were validated at this stage) signature is valid. Execution does not proceed to validate
          signature phase thus each References' DigestValue must be considered to be untrusted (attacker
@@ -364,7 +365,6 @@ export class SignedXml {
     }
 
     // (Stage B authentication step, show that the `signedInfoCanon` is signed)
-    // Synchronous verification path
     // First find the key & signature algorithm, these should match
     // Stage B: Take the signature algorithm and key and verify the `SignatureValue` against the canonicalized `SignedInfo`
     const signer = this.findSignatureAlgorithm(this.signatureAlgorithm);
@@ -375,7 +375,6 @@ export class SignedXml {
 
     // Check the signature verification to know whether to reset signature value or not.
     const sigRes = signer.verifySignature(unverifiedSignedInfoCanon, key, this.signatureValue);
-
     if (sigRes === true) {
       return true;
     } else {
@@ -540,7 +539,8 @@ export class SignedXml {
       elem = elemOrXpath;
     }
 
-    for (const ref of this.references) {
+    /* eslint-disable-next-line deprecation/deprecation */
+    for (const ref of this.getReferences()) {
       const uri = ref.uri?.[0] === "#" ? ref.uri.substring(1) : ref.uri;
 
       for (const attr of this.idAttributes) {
@@ -563,7 +563,7 @@ export class SignedXml {
     throw new Error("No references passed validation");
   }
 
-  private validateReference(ref: Reference, doc: Document);
+  private validateReference(ref: Reference, doc: Document): boolean;
   private validateReference(
     ref: Reference,
     doc: Document,
@@ -1175,7 +1175,7 @@ export class SignedXml {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const signatureDoc = nodeXml.documentElement.firstChild!;
 
-    const referenceNode = xpath.select1(location.reference!, doc);
+    const referenceNode = xpath.select1(location.reference, doc);
 
     if (!isDomNode.isNodeLike(referenceNode)) {
       throw new Error(
@@ -1253,7 +1253,8 @@ export class SignedXml {
     prefix = prefix || "";
     prefix = prefix ? `${prefix}:` : prefix;
 
-    const refs = this.references;
+    /* eslint-disable-next-line deprecation/deprecation */
+    const refs = this.getReferences();
     const referenceXmls: string[] = [];
     let totalNodes = 0;
     let completed = 0;
@@ -1338,26 +1339,26 @@ export class SignedXml {
       }
 
       nodes.forEach((node) => {
-        let refXml = "";
+        let res = "";
         if (ref.isEmptyUri) {
-          refXml += `<${prefix}Reference URI="">`;
+          res += `<${prefix}Reference URI="">`;
         } else {
           const id = this.ensureHasId(node);
           ref.uri = id;
-          refXml += `<${prefix}Reference URI="#${id}">`;
+          res += `<${prefix}Reference URI="#${id}">`;
         }
-        refXml += `<${prefix}Transforms>`;
+        res += `<${prefix}Transforms>`;
         for (const trans of ref.transforms || []) {
           const transform = this.findCanonicalizationAlgorithm(trans);
-          refXml += `<${prefix}Transform Algorithm="${transform.getAlgorithmName()}"`;
+          res += `<${prefix}Transform Algorithm="${transform.getAlgorithmName()}"`;
           if (utils.isArrayHasLength(ref.inclusiveNamespacesPrefixList)) {
-            refXml += ">";
-            refXml += `<InclusiveNamespaces PrefixList="${ref.inclusiveNamespacesPrefixList.join(
+            res += ">";
+            res += `<InclusiveNamespaces PrefixList="${ref.inclusiveNamespacesPrefixList.join(
               " ",
             )}" xmlns="${transform.getAlgorithmName()}"/>`;
-            refXml += `</${prefix}Transform>`;
+            res += `</${prefix}Transform>`;
           } else {
-            refXml += " />";
+            res += " />";
           }
         }
 
@@ -1373,13 +1374,13 @@ export class SignedXml {
             return;
           }
 
-          refXml +=
+          res +=
             `</${prefix}Transforms>` +
             `<${prefix}DigestMethod Algorithm="${digestAlgorithm.getAlgorithmName()}" />` +
             `<${prefix}DigestValue>${digest}</${prefix}DigestValue>` +
             `</${prefix}Reference>`;
 
-          referenceXmls.push(refXml);
+          referenceXmls.push(res);
           completed++;
 
           if (completed === totalNodes) {
@@ -1496,20 +1497,18 @@ export class SignedXml {
     currentPrefix = prefix || "";
     currentPrefix = currentPrefix ? `${currentPrefix}:` : currentPrefix;
 
-    let header = `<${currentPrefix}SignedInfo>`;
-    header += `<${currentPrefix}CanonicalizationMethod Algorithm="${transform.getAlgorithmName()}"`;
+    let res = `<${currentPrefix}SignedInfo>`;
+    res += `<${currentPrefix}CanonicalizationMethod Algorithm="${transform.getAlgorithmName()}"`;
     if (utils.isArrayHasLength(this.inclusiveNamespacesPrefixList)) {
-      header += ">";
-      header += `<InclusiveNamespaces PrefixList="${this.inclusiveNamespacesPrefixList.join(
+      res += ">";
+      res += `<InclusiveNamespaces PrefixList="${this.inclusiveNamespacesPrefixList.join(
         " ",
       )}" xmlns="${transform.getAlgorithmName()}"/>`;
-      header += `</${currentPrefix}CanonicalizationMethod>`;
+      res += `</${currentPrefix}CanonicalizationMethod>`;
     } else {
-      header += " />";
+      res += " />";
     }
-    header += `<${currentPrefix}SignatureMethod Algorithm="${algo.getAlgorithmName()}" />`;
-
-    const footer = `</${currentPrefix}SignedInfo>`;
+    res += `<${currentPrefix}SignatureMethod Algorithm="${algo.getAlgorithmName()}" />`;
 
     // Async mode
     if (callback) {
@@ -1518,14 +1517,14 @@ export class SignedXml {
           callback(err);
           return;
         }
-        callback(null, header + referencesXml + footer);
+        callback(null, res + referencesXml + `</${currentPrefix}SignedInfo>`);
       });
       return;
     }
 
     // Sync mode
     const referencesXml = this.createReferences(doc, prefix);
-    return header + referencesXml + footer;
+    return res + referencesXml + `</${currentPrefix}SignedInfo>`;
   }
 
   /**
