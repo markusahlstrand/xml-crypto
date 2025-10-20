@@ -19,8 +19,9 @@ export type BinaryLike = crypto.BinaryLike | ArrayBuffer;
 /**
  * Key types that can be used with xml-crypto.
  * Includes Node.js crypto.KeyLike (for Node.js crypto) and Web Crypto API CryptoKey.
+ * Also supports Uint8Array for raw key material.
  */
-export type KeyLike = crypto.KeyLike | CryptoKey;
+export type KeyLike = crypto.KeyLike | CryptoKey | Uint8Array;
 
 export type CanonicalizationAlgorithmType =
   | "http://www.w3.org/TR/2001/REC-xml-c14n-20010315"
@@ -282,34 +283,6 @@ export function createAsyncOptionalCallbackFunction<T, A extends unknown[]>(
     }
   }) as {
     (...args: A): Promise<T>;
-    (...args: [...A, ErrorFirstCallback<T>]): void;
-  };
-}
-
-/**
- * This function creates a callback-required async function (for WebCrypto).
- * Unlike createAsyncOptionalCallbackFunction, this throws an error if no callback is provided.
- *
- * This is used for WebCrypto algorithms to enforce callback usage, eliminating the need
- * for Promise detection logic in signed-xml.ts.
- */
-export function createCallbackRequiredFunction<T, A extends unknown[]>(
-  asyncVersion: (...args: A) => Promise<T>,
-  errorMessage: string,
-): {
-  (...args: A): T;
-  (...args: [...A, ErrorFirstCallback<T>]): void;
-} {
-  return ((...args: A | [...A, ErrorFirstCallback<T>]) => {
-    const possibleCallback = args[args.length - 1];
-    if (!isErrorFirstCallback(possibleCallback)) {
-      throw new Error(errorMessage);
-    }
-    asyncVersion(...(args.slice(0, -1) as A))
-      .then((result) => possibleCallback(null, result))
-      .catch((err) => possibleCallback(err instanceof Error ? err : new Error("Unknown error")));
-  }) as {
-    (...args: A): T;
     (...args: [...A, ErrorFirstCallback<T>]): void;
   };
 }
