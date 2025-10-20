@@ -1058,9 +1058,7 @@ export class SignedXml {
     // add the xml namespace attribute
     signatureAttrs.push(`${xmlNsAttr}="http://www.w3.org/2000/09/xmldsig#"`);
 
-    // Start the process: create SignedInfo (sync or async)
     if (callback) {
-      // Async mode
       this.createSignedInfo(doc, prefix, (err, signedInfoXml) => {
         if (err) {
           callback(err);
@@ -1134,7 +1132,6 @@ export class SignedXml {
         }
         const signedInfoNode = signedInfoNodes[0];
 
-        // Calculate signature value asynchronously
         this.calculateSignatureValue(doc, (err, signature) => {
           if (err) {
             callback(err);
@@ -1147,74 +1144,69 @@ export class SignedXml {
           }
         });
       });
-      return;
-    }
+    } else {
+      // Build the signature XML
+      let signatureXml = `<${currentPrefix}Signature ${signatureAttrs.join(" ")}>`;
+      signatureXml += this.createSignedInfo(doc, prefix);
+      signatureXml += this.getKeyInfo(prefix);
+      signatureXml += `</${currentPrefix}Signature>`;
 
-    // Sync mode
-    const signedInfoXml = this.createSignedInfo(doc, prefix) as string;
+      this.originalXmlWithIds = doc.toString();
 
-    // Build the signature XML
-    let signatureXml = `<${currentPrefix}Signature ${signatureAttrs.join(" ")}>`;
-    signatureXml += signedInfoXml;
-    signatureXml += this.getKeyInfo(prefix);
-    signatureXml += `</${currentPrefix}Signature>`;
+      let existingPrefixesString = "";
+      Object.keys(existingPrefixes).forEach(function (key) {
+        existingPrefixesString += `xmlns:${key}="${existingPrefixes[key]}" `;
+      });
 
-    this.originalXmlWithIds = doc.toString();
+      // A trick to remove the namespaces that already exist in the xml
+      // This only works if the prefix and namespace match with those in the xml
+      const dummySignatureWrapper = `<Dummy ${existingPrefixesString}>${signatureXml}</Dummy>`;
+      const nodeXml = new xmldom.DOMParser().parseFromString(dummySignatureWrapper);
 
-    let existingPrefixesString = "";
-    Object.keys(existingPrefixes).forEach(function (key) {
-      existingPrefixesString += `xmlns:${key}="${existingPrefixes[key]}" `;
-    });
+      // Because we are using a dummy wrapper hack described above, we know there will be a `firstChild`
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const signatureDoc = nodeXml.documentElement.firstChild!;
 
-    // A trick to remove the namespaces that already exist in the xml
-    // This only works if the prefix and namespace match with those in the xml
-    const dummySignatureWrapper = `<Dummy ${existingPrefixesString}>${signatureXml}</Dummy>`;
-    const nodeXml = new xmldom.DOMParser().parseFromString(dummySignatureWrapper);
+      const referenceNode = xpath.select1(location.reference, doc);
 
-    // Because we are using a dummy wrapper hack described above, we know there will be a `firstChild`
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const signatureDoc = nodeXml.documentElement.firstChild!;
-
-    const referenceNode = xpath.select1(location.reference, doc);
-
-    if (!isDomNode.isNodeLike(referenceNode)) {
-      throw new Error(
-        `the following xpath cannot be used because it was not found: ${location.reference}`,
-      );
-    }
-
-    if (location.action === "append") {
-      referenceNode.appendChild(signatureDoc);
-    } else if (location.action === "prepend") {
-      referenceNode.insertBefore(signatureDoc, referenceNode.firstChild);
-    } else if (location.action === "before") {
-      if (referenceNode.parentNode == null) {
+      if (!isDomNode.isNodeLike(referenceNode)) {
         throw new Error(
-          "`location.reference` refers to the root node (by default), so we can't insert `before`",
+          `the following xpath cannot be used because it was not found: ${location.reference}`,
         );
       }
-      referenceNode.parentNode.insertBefore(signatureDoc, referenceNode);
-    } else if (location.action === "after") {
-      if (referenceNode.parentNode == null) {
-        throw new Error(
-          "`location.reference` refers to the root node (by default), so we can't insert `after`",
-        );
+
+      if (location.action === "append") {
+        referenceNode.appendChild(signatureDoc);
+      } else if (location.action === "prepend") {
+        referenceNode.insertBefore(signatureDoc, referenceNode.firstChild);
+      } else if (location.action === "before") {
+        if (referenceNode.parentNode == null) {
+          throw new Error(
+            "`location.reference` refers to the root node (by default), so we can't insert `before`",
+          );
+        }
+        referenceNode.parentNode.insertBefore(signatureDoc, referenceNode);
+      } else if (location.action === "after") {
+        if (referenceNode.parentNode == null) {
+          throw new Error(
+            "`location.reference` refers to the root node (by default), so we can't insert `after`",
+          );
+        }
+        referenceNode.parentNode.insertBefore(signatureDoc, referenceNode.nextSibling);
       }
-      referenceNode.parentNode.insertBefore(signatureDoc, referenceNode.nextSibling);
-    }
 
-    this.signatureNode = signatureDoc;
-    const signedInfoNodes = utils.findChildren(this.signatureNode, "SignedInfo");
-    if (signedInfoNodes.length === 0) {
-      throw new Error("could not find SignedInfo element in the message");
-    }
-    const signedInfoNode = signedInfoNodes[0];
+      this.signatureNode = signatureDoc;
+      const signedInfoNodes = utils.findChildren(this.signatureNode, "SignedInfo");
+      if (signedInfoNodes.length === 0) {
+        throw new Error("could not find SignedInfo element in the message");
+      }
+      const signedInfoNode = signedInfoNodes[0];
 
-    // Calculate signature value synchronously
-    this.calculateSignatureValue(doc);
-    signatureDoc.insertBefore(this.createSignature(prefix), signedInfoNode.nextSibling);
-    this.signatureXml = signatureDoc.toString();
-    this.signedXml = doc.toString();
+      this.calculateSignatureValue(doc);
+      signatureDoc.insertBefore(this.createSignature(prefix), signedInfoNode.nextSibling);
+      this.signatureXml = signatureDoc.toString();
+      this.signedXml = doc.toString();
+    }
   }
 
   private getKeyInfo(prefix) {
@@ -1255,16 +1247,8 @@ export class SignedXml {
 
     /* eslint-disable-next-line deprecation/deprecation */
     const refs = this.getReferences();
+    let res = "";
     const referenceXmls: string[] = [];
-
-    // Build all reference data first (synchronous work)
-    const referenceData: Array<{
-      ref: Reference;
-      node: Node;
-      xmlPrefix: string;
-      canonXml: string;
-      digestAlgorithm: HashAlgorithm;
-    }> = [];
 
     for (const ref of refs) {
       const nodes = xpath.selectWithResolver(ref.xpath ?? "", doc, this.namespaceResolver);
@@ -1281,83 +1265,64 @@ export class SignedXml {
       }
 
       for (const node of nodes) {
-        // Build XML prefix (opening tags, transforms)
-        let xmlPrefix = "";
         if (ref.isEmptyUri) {
-          xmlPrefix += `<${prefix}Reference URI="">`;
+          res += `<${prefix}Reference URI="">`;
         } else {
           const id = this.ensureHasId(node);
           ref.uri = id;
-          xmlPrefix += `<${prefix}Reference URI="#${id}">`;
+          res += `<${prefix}Reference URI="#${id}">`;
         }
-        xmlPrefix += `<${prefix}Transforms>`;
+        res += `<${prefix}Transforms>`;
         for (const trans of ref.transforms || []) {
           const transform = this.findCanonicalizationAlgorithm(trans);
-          xmlPrefix += `<${prefix}Transform Algorithm="${transform.getAlgorithmName()}"`;
+          res += `<${prefix}Transform Algorithm="${transform.getAlgorithmName()}"`;
           if (utils.isArrayHasLength(ref.inclusiveNamespacesPrefixList)) {
-            xmlPrefix += ">";
-            xmlPrefix += `<InclusiveNamespaces PrefixList="${ref.inclusiveNamespacesPrefixList.join(
+            res += ">";
+            res += `<InclusiveNamespaces PrefixList="${ref.inclusiveNamespacesPrefixList.join(
               " ",
             )}" xmlns="${transform.getAlgorithmName()}"/>`;
-            xmlPrefix += `</${prefix}Transform>`;
+            res += `</${prefix}Transform>`;
           } else {
-            xmlPrefix += " />";
+            res += " />";
           }
         }
-        xmlPrefix += `</${prefix}Transforms>`;
+        res += `</${prefix}Transforms>`;
 
-        // Get canonical XML and digest algorithm
         const canonXml = this.getCanonReferenceXml(doc, ref, node);
         const digestAlgorithm = this.findHashAlgorithm(ref.digestAlgorithm);
 
-        referenceData.push({ ref, node, xmlPrefix, canonXml, digestAlgorithm });
+        if (!callback) {
+          const digestValue = digestAlgorithm.getHash(canonXml);
+          res += `<${prefix}DigestMethod Algorithm="${digestAlgorithm.getAlgorithmName()}" />`;
+          res += `<${prefix}DigestValue>${digestValue}</${prefix}DigestValue>`;
+          res += `</${prefix}Reference>`;
+        } else {
+          // Capture the current reference XML prefix before the async callback
+          const refXmlPrefix = res;
+          res = ""; // Reset for next iteration
+          
+          digestAlgorithm.getHash(canonXml, (err, digest) => {
+            if (err) {
+              callback(err);
+              return;
+            }
+
+            let refXml = refXmlPrefix;
+            refXml += `<${prefix}DigestMethod Algorithm="${digestAlgorithm.getAlgorithmName()}" />`;
+            refXml += `<${prefix}DigestValue>${digest}</${prefix}DigestValue>`;
+            refXml += `</${prefix}Reference>`;
+            referenceXmls.push(refXml);
+
+            if (referenceXmls.length === nodes.length * refs.length) {
+              callback(null, referenceXmls.join(""));
+            }
+          });
+        }
       }
     }
 
-    // Branch for sync/async only after all referenceData is built
     if (!callback) {
-      let res = "";
-      for (const { xmlPrefix, canonXml, digestAlgorithm } of referenceData) {
-        const digestValue = digestAlgorithm.getHash(canonXml);
-        res +=
-          xmlPrefix +
-          `<${prefix}DigestMethod Algorithm="${digestAlgorithm.getAlgorithmName()}" />` +
-          `<${prefix}DigestValue>${digestValue}</${prefix}DigestValue>` +
-          `</${prefix}Reference>`;
-      }
       return res;
-    } else {
-      if (referenceData.length === 0) {
-        callback(null, "");
-        return;
-      }
-
-      let completed = 0;
-      let hasError = false;
-
-      referenceData.forEach(({ xmlPrefix, canonXml, digestAlgorithm }) => {
-        digestAlgorithm.getHash(canonXml, (err, digest) => {
-          if (hasError) return;
-
-          if (err) {
-            hasError = true;
-            callback(err);
-            return;
-          }
-
-          const refXml =
-            xmlPrefix +
-            `<${prefix}DigestMethod Algorithm="${digestAlgorithm.getAlgorithmName()}" />` +
-            `<${prefix}DigestValue>${digest}</${prefix}DigestValue>` +
-            `</${prefix}Reference>`;
-          referenceXmls.push(refXml);
-          completed++;
-
-          if (completed === referenceData.length) {
-            callback(null, referenceXmls.join(""));
-          }
-        });
-      });
     }
   }
 
