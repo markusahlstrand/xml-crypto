@@ -1268,6 +1268,47 @@ export class SignedXml {
       }
     });
 
+    // Helper to build reference XML up to the digest value
+    const buildReferenceXmlPrefix = (ref: Reference, node: Node, prefix: string): string => {
+      let res = "";
+      if (ref.isEmptyUri) {
+        res += `<${prefix}Reference URI="">`;
+      } else {
+        const id = this.ensureHasId(node);
+        ref.uri = id;
+        res += `<${prefix}Reference URI="#${id}">`;
+      }
+      res += `<${prefix}Transforms>`;
+      for (const trans of ref.transforms || []) {
+        const transform = this.findCanonicalizationAlgorithm(trans);
+        res += `<${prefix}Transform Algorithm="${transform.getAlgorithmName()}"`;
+        if (utils.isArrayHasLength(ref.inclusiveNamespacesPrefixList)) {
+          res += ">";
+          res += `<InclusiveNamespaces PrefixList="${ref.inclusiveNamespacesPrefixList.join(
+            " ",
+          )}" xmlns="${transform.getAlgorithmName()}"/>`;
+          res += `</${prefix}Transform>`;
+        } else {
+          res += " />";
+        }
+      }
+      res += `</${prefix}Transforms>`;
+      return res;
+    };
+
+    // Helper to build digest and close reference XML
+    const buildReferenceXmlSuffix = (
+      digestAlgorithmName: string,
+      digestValue: string,
+      prefix: string,
+    ): string => {
+      return (
+        `<${prefix}DigestMethod Algorithm="${digestAlgorithmName}" />` +
+        `<${prefix}DigestValue>${digestValue}</${prefix}DigestValue>` +
+        `</${prefix}Reference>`
+      );
+    };
+
     // Sync mode - build references synchronously
     if (!callback) {
       let res = "";
@@ -1281,37 +1322,11 @@ export class SignedXml {
         }
 
         for (const node of nodes) {
-          if (ref.isEmptyUri) {
-            res += `<${prefix}Reference URI="">`;
-          } else {
-            const id = this.ensureHasId(node);
-            ref.uri = id;
-            res += `<${prefix}Reference URI="#${id}">`;
-          }
-          res += `<${prefix}Transforms>`;
-          for (const trans of ref.transforms || []) {
-            const transform = this.findCanonicalizationAlgorithm(trans);
-            res += `<${prefix}Transform Algorithm="${transform.getAlgorithmName()}"`;
-            if (utils.isArrayHasLength(ref.inclusiveNamespacesPrefixList)) {
-              res += ">";
-              res += `<InclusiveNamespaces PrefixList="${ref.inclusiveNamespacesPrefixList.join(
-                " ",
-              )}" xmlns="${transform.getAlgorithmName()}"/>`;
-              res += `</${prefix}Transform>`;
-            } else {
-              res += " />";
-            }
-          }
-
+          res += buildReferenceXmlPrefix(ref, node, prefix);
           const canonXml = this.getCanonReferenceXml(doc, ref, node);
           const digestAlgorithm = this.findHashAlgorithm(ref.digestAlgorithm);
           const digestValue = digestAlgorithm.getHash(canonXml);
-
-          res +=
-            `</${prefix}Transforms>` +
-            `<${prefix}DigestMethod Algorithm="${digestAlgorithm.getAlgorithmName()}" />` +
-            `<${prefix}DigestValue>${digestValue}</${prefix}DigestValue>` +
-            `</${prefix}Reference>`;
+          res += buildReferenceXmlSuffix(digestAlgorithm.getAlgorithmName(), digestValue, prefix);
         }
       }
       return res;
@@ -1339,29 +1354,7 @@ export class SignedXml {
       }
 
       nodes.forEach((node) => {
-        let res = "";
-        if (ref.isEmptyUri) {
-          res += `<${prefix}Reference URI="">`;
-        } else {
-          const id = this.ensureHasId(node);
-          ref.uri = id;
-          res += `<${prefix}Reference URI="#${id}">`;
-        }
-        res += `<${prefix}Transforms>`;
-        for (const trans of ref.transforms || []) {
-          const transform = this.findCanonicalizationAlgorithm(trans);
-          res += `<${prefix}Transform Algorithm="${transform.getAlgorithmName()}"`;
-          if (utils.isArrayHasLength(ref.inclusiveNamespacesPrefixList)) {
-            res += ">";
-            res += `<InclusiveNamespaces PrefixList="${ref.inclusiveNamespacesPrefixList.join(
-              " ",
-            )}" xmlns="${transform.getAlgorithmName()}"/>`;
-            res += `</${prefix}Transform>`;
-          } else {
-            res += " />";
-          }
-        }
-
+        const xmlPrefix = buildReferenceXmlPrefix(ref, node, prefix);
         const canonXml = this.getCanonReferenceXml(doc, ref, node);
         const digestAlgorithm = this.findHashAlgorithm(ref.digestAlgorithm);
 
@@ -1374,13 +1367,9 @@ export class SignedXml {
             return;
           }
 
-          res +=
-            `</${prefix}Transforms>` +
-            `<${prefix}DigestMethod Algorithm="${digestAlgorithm.getAlgorithmName()}" />` +
-            `<${prefix}DigestValue>${digest}</${prefix}DigestValue>` +
-            `</${prefix}Reference>`;
-
-          referenceXmls.push(res);
+          const refXml =
+            xmlPrefix + buildReferenceXmlSuffix(digestAlgorithm.getAlgorithmName(), digest!, prefix);
+          referenceXmls.push(refXml);
           completed++;
 
           if (completed === totalNodes) {
