@@ -1,4 +1,4 @@
-import { createAsyncOptionalCallbackFunction, type SignatureAlgorithm } from "./types";
+import { createCallbackRequiredFunction, type SignatureAlgorithm } from "./types";
 import {
   importRsaPrivateKey,
   importRsaPublicKey,
@@ -150,7 +150,7 @@ function toArrayBuffer(data: unknown): ArrayBuffer {
  * Uses the Web Crypto API which is available in browsers and modern Node.js
  */
 export class WebCryptoRsaSha1 implements SignatureAlgorithm {
-  getSignature = createAsyncOptionalCallbackFunction(
+  getSignature = createCallbackRequiredFunction(
     async (signedInfo: unknown, privateKey: unknown): Promise<string> => {
       // If already a CryptoKey, use it directly
       let key: CryptoKey;
@@ -167,9 +167,10 @@ export class WebCryptoRsaSha1 implements SignatureAlgorithm {
       const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, data);
       return arrayBufferToBase64(signature);
     },
+    "WebCrypto signature algorithms are async and require a callback. Use getSignature(signedInfo, privateKey, callback).",
   );
 
-  verifySignature = createAsyncOptionalCallbackFunction(
+  verifySignature = createCallbackRequiredFunction(
     async (material: string, key: unknown, signatureValue: string): Promise<boolean> => {
       // If already a CryptoKey, use it directly
       let publicKey: CryptoKey;
@@ -185,6 +186,7 @@ export class WebCryptoRsaSha1 implements SignatureAlgorithm {
       const signature = base64ToArrayBuffer(signatureValue);
       return await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, signature, data);
     },
+    "WebCrypto signature algorithms are async and require a callback. Use verifySignature(material, key, signatureValue, callback).",
   );
 
   getAlgorithmName = (): string => {
@@ -197,7 +199,7 @@ export class WebCryptoRsaSha1 implements SignatureAlgorithm {
  * Uses the Web Crypto API which is available in browsers and modern Node.js
  */
 export class WebCryptoRsaSha256 implements SignatureAlgorithm {
-  getSignature = createAsyncOptionalCallbackFunction(
+  getSignature = createCallbackRequiredFunction(
     async (signedInfo: unknown, privateKey: unknown): Promise<string> => {
       // If already a CryptoKey, use it directly
       let key: CryptoKey;
@@ -215,8 +217,9 @@ export class WebCryptoRsaSha256 implements SignatureAlgorithm {
 
       return arrayBufferToBase64(signature);
     },
+    "WebCrypto signature algorithms are async and require a callback. Use getSignature(signedInfo, privateKey, callback).",
   );
-  verifySignature = createAsyncOptionalCallbackFunction(
+  verifySignature = createCallbackRequiredFunction(
     async (material: string, key: unknown, signatureValue: string): Promise<boolean> => {
       // If already a CryptoKey, use it directly
       let publicKey: CryptoKey;
@@ -233,6 +236,7 @@ export class WebCryptoRsaSha256 implements SignatureAlgorithm {
 
       return await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, signature, data);
     },
+    "WebCrypto signature algorithms are async and require a callback. Use verifySignature(material, key, signatureValue, callback).",
   );
   getAlgorithmName = (): string => {
     return "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256";
@@ -244,7 +248,7 @@ export class WebCryptoRsaSha256 implements SignatureAlgorithm {
  * Uses the Web Crypto API which is available in browsers and modern Node.js
  */
 export class WebCryptoRsaSha512 implements SignatureAlgorithm {
-  getSignature = createAsyncOptionalCallbackFunction(
+  getSignature = createCallbackRequiredFunction(
     async (signedInfo: unknown, privateKey: unknown): Promise<string> => {
       // If already a CryptoKey, use it directly
       let key: CryptoKey;
@@ -262,8 +266,9 @@ export class WebCryptoRsaSha512 implements SignatureAlgorithm {
 
       return arrayBufferToBase64(signature);
     },
+    "WebCrypto signature algorithms are async and require a callback. Use getSignature(signedInfo, privateKey, callback).",
   );
-  verifySignature = createAsyncOptionalCallbackFunction(
+  verifySignature = createCallbackRequiredFunction(
     async (material: string, key: unknown, signatureValue: string): Promise<boolean> => {
       // If already a CryptoKey, use it directly
       let publicKey: CryptoKey;
@@ -280,6 +285,7 @@ export class WebCryptoRsaSha512 implements SignatureAlgorithm {
 
       return await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, signature, data);
     },
+    "WebCrypto signature algorithms are async and require a callback. Use verifySignature(material, key, signatureValue, callback).",
   );
   getAlgorithmName = (): string => {
     return "http://www.w3.org/2001/04/xmldsig-more#rsa-sha512";
@@ -291,7 +297,7 @@ export class WebCryptoRsaSha512 implements SignatureAlgorithm {
  * Uses the Web Crypto API which is available in browsers and modern Node.js
  */
 export class WebCryptoHmacSha1 implements SignatureAlgorithm {
-  getSignature = createAsyncOptionalCallbackFunction(
+  getSignature = createCallbackRequiredFunction(
     async (signedInfo: unknown, privateKey: unknown): Promise<string> => {
       // If already a CryptoKey, use it directly
       let key: CryptoKey;
@@ -310,9 +316,10 @@ export class WebCryptoHmacSha1 implements SignatureAlgorithm {
 
       return arrayBufferToBase64(signature);
     },
+    "WebCrypto signature algorithms are async and require a callback. Use getSignature(signedInfo, privateKey, callback).",
   );
 
-  verifySignature = createAsyncOptionalCallbackFunction(
+  verifySignature = createCallbackRequiredFunction(
     async (material: string, key: unknown, signatureValue: string): Promise<boolean> => {
       // If already a CryptoKey, use it directly
       let hmacKey: CryptoKey;
@@ -331,6 +338,7 @@ export class WebCryptoHmacSha1 implements SignatureAlgorithm {
       // Use crypto.subtle.verify for constant-time comparison (prevents timing attacks)
       return await crypto.subtle.verify("HMAC", hmacKey, signature, data);
     },
+    "WebCrypto signature algorithms are async and require a callback. Use verifySignature(material, key, signatureValue, callback).",
   );
 
   getAlgorithmName = (): string => {

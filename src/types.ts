@@ -163,7 +163,8 @@ export interface CanonicalizationOrTransformationAlgorithm {
 export interface HashAlgorithm {
   getAlgorithmName(): HashAlgorithmType;
 
-  getHash(xml: string): string | Promise<string>;
+  getHash(xml: string): string;
+  getHash(xml: string, callback: ErrorFirstCallback<string>): void;
 }
 
 /** Extend this to create a new SignatureAlgorithm */
@@ -171,27 +172,23 @@ export interface SignatureAlgorithm {
   /**
    * Sign the given string using the given key
    */
-  getSignature(signedInfo: BinaryLike, privateKey: KeyLike): string | Promise<string>;
+  getSignature(signedInfo: BinaryLike, privateKey: KeyLike): string;
   getSignature(
     signedInfo: BinaryLike,
     privateKey: KeyLike,
-    callback?: ErrorFirstCallback<string>,
+    callback: ErrorFirstCallback<string>,
   ): void;
   /**
    * Verify the given signature of the given string using key
    *
    * @param key a public cert, public key, or private key can be passed here
    */
+  verifySignature(material: string, key: KeyLike, signatureValue: string): boolean;
   verifySignature(
     material: string,
     key: KeyLike,
     signatureValue: string,
-  ): boolean | Promise<boolean>;
-  verifySignature(
-    material: string,
-    key: KeyLike,
-    signatureValue: string,
-    callback?: ErrorFirstCallback<boolean>,
+    callback: ErrorFirstCallback<boolean>,
   ): void;
 
   getAlgorithmName(): SignatureAlgorithmType;
@@ -285,6 +282,34 @@ export function createAsyncOptionalCallbackFunction<T, A extends unknown[]>(
     }
   }) as {
     (...args: A): Promise<T>;
+    (...args: [...A, ErrorFirstCallback<T>]): void;
+  };
+}
+
+/**
+ * This function creates a callback-required async function (for WebCrypto).
+ * Unlike createAsyncOptionalCallbackFunction, this throws an error if no callback is provided.
+ *
+ * This is used for WebCrypto algorithms to enforce callback usage, eliminating the need
+ * for Promise detection logic in signed-xml.ts.
+ */
+export function createCallbackRequiredFunction<T, A extends unknown[]>(
+  asyncVersion: (...args: A) => Promise<T>,
+  errorMessage: string,
+): {
+  (...args: A): T;
+  (...args: [...A, ErrorFirstCallback<T>]): void;
+} {
+  return ((...args: A | [...A, ErrorFirstCallback<T>]) => {
+    const possibleCallback = args[args.length - 1];
+    if (!isErrorFirstCallback(possibleCallback)) {
+      throw new Error(errorMessage);
+    }
+    asyncVersion(...(args.slice(0, -1) as A))
+      .then((result) => possibleCallback(null, result))
+      .catch((err) => possibleCallback(err instanceof Error ? err : new Error("Unknown error")));
+  }) as {
+    (...args: A): T;
     (...args: [...A, ErrorFirstCallback<T>]): void;
   };
 }
