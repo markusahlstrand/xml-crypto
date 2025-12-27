@@ -183,11 +183,19 @@ export class WebCryptoRsaSha1 implements SignatureAlgorithm {
       }
 
       const data = toArrayBuffer(signedInfo);
+<<<<<<< HEAD
       const signature = await getSubtle().sign("RSASSA-PKCS1-v1_5", key, data);
       return arrayBufferToBase64(signature);
     })()
       .then((result) => callback(null, result))
       .catch((err) => callback(err instanceof Error ? err : new Error("Unknown error"), ""));
+=======
+      const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, data);
+      return arrayBufferToBase64(signature);
+    })()
+      .then((result) => callback(null, result))
+      .catch((err) => callback(err instanceof Error ? err : new Error("Unknown error")));
+>>>>>>> master
   }
 
   verifySignature(material: string, key: KeyLike, signatureValue: string): boolean;
@@ -220,10 +228,17 @@ export class WebCryptoRsaSha1 implements SignatureAlgorithm {
 
       const data = new TextEncoder().encode(material);
       const signature = base64ToArrayBuffer(signatureValue);
+<<<<<<< HEAD
       return await getSubtle().verify("RSASSA-PKCS1-v1_5", publicKey, signature, data);
     })()
       .then((result) => callback(null, result))
       .catch((err) => callback(err instanceof Error ? err : new Error("Unknown error"), false));
+=======
+      return await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, signature, data);
+    })()
+      .then((result) => callback(null, result))
+      .catch((err) => callback(err instanceof Error ? err : new Error("Unknown error")));
+>>>>>>> master
   }
 
   getAlgorithmName(): string {
@@ -263,11 +278,19 @@ export class WebCryptoRsaSha256 implements SignatureAlgorithm {
       }
 
       const data = toArrayBuffer(signedInfo);
+<<<<<<< HEAD
       const signature = await getSubtle().sign("RSASSA-PKCS1-v1_5", key, data);
       return arrayBufferToBase64(signature);
     })()
       .then((result) => callback(null, result))
       .catch((err) => callback(err instanceof Error ? err : new Error("Unknown error"), ""));
+=======
+      const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, data);
+      return arrayBufferToBase64(signature);
+    })()
+      .then((result) => callback(null, result))
+      .catch((err) => callback(err instanceof Error ? err : new Error("Unknown error")));
+>>>>>>> master
   }
 
   verifySignature(material: string, key: KeyLike, signatureValue: string): boolean;
@@ -300,10 +323,17 @@ export class WebCryptoRsaSha256 implements SignatureAlgorithm {
 
       const data = new TextEncoder().encode(material);
       const signature = base64ToArrayBuffer(signatureValue);
+<<<<<<< HEAD
       return await getSubtle().verify("RSASSA-PKCS1-v1_5", publicKey, signature, data);
     })()
       .then((result) => callback(null, result))
       .catch((err) => callback(err instanceof Error ? err : new Error("Unknown error"), false));
+=======
+      return await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, signature, data);
+    })()
+      .then((result) => callback(null, result))
+      .catch((err) => callback(err instanceof Error ? err : new Error("Unknown error")));
+>>>>>>> master
   }
 
   getAlgorithmName(): string {
@@ -343,11 +373,19 @@ export class WebCryptoRsaSha512 implements SignatureAlgorithm {
       }
 
       const data = toArrayBuffer(signedInfo);
+<<<<<<< HEAD
       const signature = await getSubtle().sign("RSASSA-PKCS1-v1_5", key, data);
       return arrayBufferToBase64(signature);
     })()
       .then((result) => callback(null, result))
       .catch((err) => callback(err instanceof Error ? err : new Error("Unknown error"), ""));
+=======
+      const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, data);
+      return arrayBufferToBase64(signature);
+    })()
+      .then((result) => callback(null, result))
+      .catch((err) => callback(err instanceof Error ? err : new Error("Unknown error")));
+>>>>>>> master
   }
 
   verifySignature(material: string, key: KeyLike, signatureValue: string): boolean;
@@ -380,10 +418,17 @@ export class WebCryptoRsaSha512 implements SignatureAlgorithm {
 
       const data = toArrayBuffer(material);
       const signature = base64ToArrayBuffer(signatureValue);
+<<<<<<< HEAD
       return await getSubtle().verify("RSASSA-PKCS1-v1_5", publicKey, signature, data);
     })()
       .then((result) => callback(null, result))
       .catch((err) => callback(err instanceof Error ? err : new Error("Unknown error"), false));
+=======
+      return await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, signature, data);
+    })()
+      .then((result) => callback(null, result))
+      .catch((err) => callback(err instanceof Error ? err : new Error("Unknown error")));
+>>>>>>> master
   }
 
   getAlgorithmName(): string {
@@ -424,11 +469,19 @@ export class WebCryptoHmacSha1 implements SignatureAlgorithm {
       }
 
       const data = toArrayBuffer(signedInfo);
+<<<<<<< HEAD
       const signature = await getSubtle().sign("HMAC", key, data);
       return arrayBufferToBase64(signature);
     })()
       .then((result) => callback(null, result))
       .catch((err) => callback(err instanceof Error ? err : new Error("Unknown error"), ""));
+=======
+      const signature = await crypto.subtle.sign("HMAC", key, data);
+      return arrayBufferToBase64(signature);
+    })()
+      .then((result) => callback(null, result))
+      .catch((err) => callback(err instanceof Error ? err : new Error("Unknown error")));
+>>>>>>> master
   }
 
   verifySignature(material: string, key: KeyLike, signatureValue: string): boolean;
@@ -463,11 +516,19 @@ export class WebCryptoHmacSha1 implements SignatureAlgorithm {
       const data = new TextEncoder().encode(material);
       const signature = base64ToArrayBuffer(signatureValue);
 
+<<<<<<< HEAD
       // Use getSubtle().verify for constant-time comparison (prevents timing attacks)
       return await getSubtle().verify("HMAC", hmacKey, signature, data);
     })()
       .then((result) => callback(null, result))
       .catch((err) => callback(err instanceof Error ? err : new Error("Unknown error"), false));
+=======
+      // Use crypto.subtle.verify for constant-time comparison (prevents timing attacks)
+      return await crypto.subtle.verify("HMAC", hmacKey, signature, data);
+    })()
+      .then((result) => callback(null, result))
+      .catch((err) => callback(err instanceof Error ? err : new Error("Unknown error")));
+>>>>>>> master
   }
 
   getAlgorithmName(): string {
