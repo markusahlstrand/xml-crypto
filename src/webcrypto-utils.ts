@@ -3,6 +3,122 @@
  */
 
 /**
+ * Interface for extracting public keys from X.509 certificates.
+ * Implement this interface to enable X.509 certificate support with WebCrypto.
+ */
+export interface CertificateParser {
+  /**
+   * Extract the public key (in SPKI format) from an X.509 certificate
+   * @param certPem PEM-encoded X.509 certificate
+   * @returns ArrayBuffer containing the SPKI-encoded public key
+   */
+  extractPublicKey(certPem: string): ArrayBuffer | Promise<ArrayBuffer>;
+}
+
+/**
+ * Global certificate parser instance.
+ * Set this to enable X.509 certificate support.
+ */
+let certificateParser: CertificateParser | null = null;
+
+/**
+ * Set a custom certificate parser for extracting public keys from X.509 certificates.
+ * This enables WebCrypto to work with X.509 certificates by using an external ASN.1 parser.
+ * @param parser The certificate parser implementation, or null to disable
+ * @example
+ * // Using @peculiar/x509 library
+ * import * as x509 from "@peculiar/x509";
+ * import { setCertificateParser } from "xml-crypto";
+ *
+ * setCertificateParser({
+ *   extractPublicKey(certPem: string): ArrayBuffer {
+ *     const cert = new x509.X509Certificate(certPem);
+ *     return cert.publicKey.rawData;
+ *   }
+ * });
+ */
+export function setCertificateParser(parser: CertificateParser | null): void {
+  certificateParser = parser;
+}
+
+/**
+ * Get the currently configured certificate parser.
+ * @returns The certificate parser or null if not configured
+ */
+export function getCertificateParser(): CertificateParser | null {
+  return certificateParser;
+}
+
+/**
+ * Get the SubtleCrypto interface in a cross-runtime safe way.
+ * Works in browsers (uses globalThis.crypto.subtle) and Node.js (uses node:crypto webcrypto).
+ */
+export function getSubtle(): SubtleCrypto {
+  // Check for globalThis.crypto.subtle (browsers and modern Node.js with global webcrypto)
+  if (typeof globalThis !== "undefined" && globalThis.crypto && globalThis.crypto.subtle) {
+    return globalThis.crypto.subtle;
+  }
+
+  // Node.js fallback: require node:crypto and use webcrypto
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const nodeCrypto = require("node:crypto");
+  if (nodeCrypto.webcrypto && nodeCrypto.webcrypto.subtle) {
+    return nodeCrypto.webcrypto.subtle as SubtleCrypto;
+  }
+
+  throw new Error(
+    "SubtleCrypto is not available. Ensure you are running in a browser or Node.js 16+ environment.",
+  );
+}
+
+/**
+ * Convert an ArrayBuffer to base64 string in a cross-runtime safe way.
+ * Works in browsers (uses btoa) and Node.js (uses Buffer).
+ * @param buffer ArrayBuffer to convert
+ * @returns Base64-encoded string
+ */
+export function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+
+  // Node.js: use Buffer for base64 encoding
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(bytes).toString("base64");
+  }
+
+  // Browser: use btoa
+  let binary = "";
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+/**
+ * Convert a base64 string to ArrayBuffer in a cross-runtime safe way.
+ * Works in browsers (uses atob) and Node.js (uses Buffer).
+ * @param base64 Base64-encoded string
+ * @returns ArrayBuffer
+ */
+export function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  // Node.js: use Buffer for base64 decoding
+  if (typeof Buffer !== "undefined") {
+    const buf = Buffer.from(base64, "base64");
+    // Copy to a fresh ArrayBuffer to avoid issues with Buffer's pooled memory
+    const arrayBuffer = new ArrayBuffer(buf.byteLength);
+    new Uint8Array(arrayBuffer).set(buf);
+    return arrayBuffer;
+  }
+
+  // Browser: use atob
+  const binaryString = atob(base64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+/**
  * Convert a PEM string to an ArrayBuffer
  * @param pem PEM-encoded key (with or without headers)
  * @returns ArrayBuffer containing the binary key data
@@ -14,44 +130,8 @@ export function pemToArrayBuffer(pem: string): ArrayBuffer {
     .replace(/-----END [A-Z ]+-----/, "")
     .replace(/\s/g, "");
 
-  // Decode base64 to binary string
-  const binaryString = atob(pemContent);
-
-  // Convert binary string to ArrayBuffer
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-
-  return bytes.buffer;
-}
-
-/**
- * Convert an ArrayBuffer to base64 string
- * @param buffer ArrayBuffer to convert
- * @returns Base64-encoded string
- */
-export function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
-
-/**
- * Convert a base64 string to ArrayBuffer
- * @param base64 Base64-encoded string
- * @returns ArrayBuffer
- */
-export function base64ToArrayBuffer(base64: string): ArrayBuffer {
-  const binaryString = atob(base64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes.buffer;
+  // Use cross-runtime base64 decoding
+  return base64ToArrayBuffer(pemContent);
 }
 
 /**
@@ -65,8 +145,9 @@ export async function importRsaPrivateKey(
   hashAlgorithm: string,
 ): Promise<CryptoKey> {
   const keyData = typeof pem === "string" ? pemToArrayBuffer(pem) : pem;
+  const subtle = getSubtle();
 
-  return await crypto.subtle.importKey(
+  return await subtle.importKey(
     "pkcs8",
     keyData,
     {
@@ -89,46 +170,32 @@ export async function importRsaPublicKey(
   hashAlgorithm: string,
 ): Promise<CryptoKey> {
   let keyData: ArrayBuffer;
+  const subtle = getSubtle();
 
   if (typeof pem === "string") {
     // Check if this is a certificate
     if (pem.includes("BEGIN CERTIFICATE")) {
-      // For certificates, we need to extract the public key
-      // This is a basic implementation - for production use, consider using a proper ASN.1 parser
-      // Web Crypto API doesn't support X.509 certificates directly
-      // For now, we'll try to parse it as SPKI and provide a helpful error
-      keyData = pemToArrayBuffer(pem);
-
-      // Try to extract the public key from the certificate
-      // This is a simplified approach and may not work for all certificates
-      try {
-        return await crypto.subtle.importKey(
-          "spki",
-          keyData,
-          {
-            name: "RSASSA-PKCS1-v1_5",
-            hash: { name: hashAlgorithm },
-          },
-          false,
-          ["verify"],
-        );
-      } catch (error) {
+      if (certificateParser) {
+        // Use the configured certificate parser to extract the public key
+        keyData = await Promise.resolve(certificateParser.extractPublicKey(pem));
+      } else {
         throw new Error(
-          "X.509 certificates are not directly supported by Web Crypto API. " +
-            "Please extract the public key from the certificate and provide it in SPKI format, " +
-            "or use Node.js crypto algorithms instead. " +
-            `Original error: ${error}`,
+          "X.509 certificates require a certificate parser. " +
+            "Call setCertificateParser() with a parser implementation (e.g., using @peculiar/x509), " +
+            "or extract the public key manually and provide it in SPKI format. " +
+            "See WEBCRYPTO.md for examples.",
         );
       }
+    } else {
+      keyData = pemToArrayBuffer(pem);
     }
-    keyData = pemToArrayBuffer(pem);
   } else {
     keyData = pem;
   }
 
   // Try importing as SPKI (SubjectPublicKeyInfo) format
   try {
-    return await crypto.subtle.importKey(
+    return await subtle.importKey(
       "spki",
       keyData,
       {
@@ -156,8 +223,9 @@ export async function importHmacKey(
   hashAlgorithm: string,
 ): Promise<CryptoKey> {
   const keyData = typeof key === "string" ? new TextEncoder().encode(key) : key;
+  const subtle = getSubtle();
 
-  return await crypto.subtle.importKey(
+  return await subtle.importKey(
     "raw",
     keyData,
     {

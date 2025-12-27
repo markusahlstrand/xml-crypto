@@ -398,7 +398,8 @@ export class SignedXml {
     const signer = this.findSignatureAlgorithm(this.signatureAlgorithm);
     const key = this.getCertFromKeyInfo(this.keyInfo) || this.publicCert || this.privateKey;
     if (key == null) {
-      throw new Error("KeyInfo or publicCert or privateKey is required to validate signature");
+      callback(new Error("KeyInfo or publicCert or privateKey is required to validate signature"));
+      return;
     }
 
     // Use callback for signature verification (required for WebCrypto)
@@ -1247,83 +1248,132 @@ export class SignedXml {
 
     /* eslint-disable-next-line deprecation/deprecation */
     const refs = this.getReferences();
-    let res = "";
-    const referenceXmls: string[] = [];
 
-    for (const ref of refs) {
-      const nodes = xpath.selectWithResolver(ref.xpath ?? "", doc, this.namespaceResolver);
-
-      if (!utils.isArrayHasLength(nodes)) {
-        const err = new Error(
-          `the following xpath cannot be signed because it was not found: ${ref.xpath}`,
-        );
-        if (callback) {
-          callback(err);
-          return;
+    if (!callback) {
+      // Synchronous path
+      let res = "";
+      for (const ref of refs) {
+        const nodes = xpath.selectWithResolver(ref.xpath ?? "", doc, this.namespaceResolver);
+        if (!utils.isArrayHasLength(nodes)) {
+          throw new Error(
+            `the following xpath cannot be signed because it was not found: ${ref.xpath}`,
+          );
         }
-        throw err;
-      }
-
-      for (const node of nodes) {
-        if (ref.isEmptyUri) {
-          res += `<${prefix}Reference URI="">`;
-        } else {
-          const id = this.ensureHasId(node);
-          ref.uri = id;
-          res += `<${prefix}Reference URI="#${id}">`;
-        }
-        res += `<${prefix}Transforms>`;
-        for (const trans of ref.transforms || []) {
-          const transform = this.findCanonicalizationAlgorithm(trans);
-          res += `<${prefix}Transform Algorithm="${transform.getAlgorithmName()}"`;
-          if (utils.isArrayHasLength(ref.inclusiveNamespacesPrefixList)) {
-            res += ">";
-            res += `<InclusiveNamespaces PrefixList="${ref.inclusiveNamespacesPrefixList.join(
-              " ",
-            )}" xmlns="${transform.getAlgorithmName()}"/>`;
-            res += `</${prefix}Transform>`;
+        for (const node of nodes) {
+          if (ref.isEmptyUri) {
+            res += `<${prefix}Reference URI="">`;
           } else {
-            res += " />";
+            const id = this.ensureHasId(node);
+            ref.uri = id;
+            res += `<${prefix}Reference URI="#${id}">`;
           }
-        }
-        res += `</${prefix}Transforms>`;
+          res += `<${prefix}Transforms>`;
+          for (const trans of ref.transforms || []) {
+            const transform = this.findCanonicalizationAlgorithm(trans);
+            res += `<${prefix}Transform Algorithm="${transform.getAlgorithmName()}"`;
+            if (utils.isArrayHasLength(ref.inclusiveNamespacesPrefixList)) {
+              res += ">";
+              res += `<InclusiveNamespaces PrefixList="${ref.inclusiveNamespacesPrefixList.join(
+                " ",
+              )}" xmlns="${transform.getAlgorithmName()}"/>`;
+              res += `</${prefix}Transform>`;
+            } else {
+              res += " />";
+            }
+          }
+          res += `</${prefix}Transforms>`;
 
-        const canonXml = this.getCanonReferenceXml(doc, ref, node);
-        const digestAlgorithm = this.findHashAlgorithm(ref.digestAlgorithm);
-
-        if (!callback) {
+          const canonXml = this.getCanonReferenceXml(doc, ref, node);
+          const digestAlgorithm = this.findHashAlgorithm(ref.digestAlgorithm);
           const digestValue = digestAlgorithm.getHash(canonXml);
           res += `<${prefix}DigestMethod Algorithm="${digestAlgorithm.getAlgorithmName()}" />`;
           res += `<${prefix}DigestValue>${digestValue}</${prefix}DigestValue>`;
           res += `</${prefix}Reference>`;
-        } else {
-          // Capture the current reference XML prefix before the async callback
-          const refXmlPrefix = res;
-          res = ""; // Reset for next iteration
-          
-          digestAlgorithm.getHash(canonXml, (err, digest) => {
-            if (err) {
-              callback(err);
-              return;
-            }
-
-            let refXml = refXmlPrefix;
-            refXml += `<${prefix}DigestMethod Algorithm="${digestAlgorithm.getAlgorithmName()}" />`;
-            refXml += `<${prefix}DigestValue>${digest}</${prefix}DigestValue>`;
-            refXml += `</${prefix}Reference>`;
-            referenceXmls.push(refXml);
-
-            if (referenceXmls.length === nodes.length * refs.length) {
-              callback(null, referenceXmls.join(""));
-            }
-          });
         }
+      }
+      return res;
+    }
+
+    // Async path - collect all work items first, then process
+    interface WorkItem {
+      refXmlPrefix: string;
+      canonXml: string;
+      digestAlgorithm: HashAlgorithm;
+    }
+
+    const workItems: WorkItem[] = [];
+
+    for (const ref of refs) {
+      const nodes = xpath.selectWithResolver(ref.xpath ?? "", doc, this.namespaceResolver);
+      if (!utils.isArrayHasLength(nodes)) {
+        callback(
+          new Error(
+            `the following xpath cannot be signed because it was not found: ${ref.xpath}`,
+          ),
+        );
+        return;
+      }
+
+      for (const node of nodes) {
+        let refXmlPrefix = "";
+        if (ref.isEmptyUri) {
+          refXmlPrefix += `<${prefix}Reference URI="">`;
+        } else {
+          const id = this.ensureHasId(node);
+          ref.uri = id;
+          refXmlPrefix += `<${prefix}Reference URI="#${id}">`;
+        }
+        refXmlPrefix += `<${prefix}Transforms>`;
+        for (const trans of ref.transforms || []) {
+          const transform = this.findCanonicalizationAlgorithm(trans);
+          refXmlPrefix += `<${prefix}Transform Algorithm="${transform.getAlgorithmName()}"`;
+          if (utils.isArrayHasLength(ref.inclusiveNamespacesPrefixList)) {
+            refXmlPrefix += ">";
+            refXmlPrefix += `<InclusiveNamespaces PrefixList="${ref.inclusiveNamespacesPrefixList.join(
+              " ",
+            )}" xmlns="${transform.getAlgorithmName()}"/>`;
+            refXmlPrefix += `</${prefix}Transform>`;
+          } else {
+            refXmlPrefix += " />";
+          }
+        }
+        refXmlPrefix += `</${prefix}Transforms>`;
+
+        workItems.push({
+          refXmlPrefix,
+          canonXml: this.getCanonReferenceXml(doc, ref, node),
+          digestAlgorithm: this.findHashAlgorithm(ref.digestAlgorithm),
+        });
       }
     }
 
-    if (!callback) {
-      return res;
-    }
+    // Process all items asynchronously with proper slot tracking
+    const results: string[] = new Array(workItems.length);
+    let completed = 0;
+    let hasError = false;
+
+    workItems.forEach((item, index) => {
+      item.digestAlgorithm.getHash(item.canonXml, (err, digest) => {
+        if (hasError) return;
+
+        if (err) {
+          hasError = true;
+          callback(err);
+          return;
+        }
+
+        results[index] =
+          item.refXmlPrefix +
+          `<${prefix}DigestMethod Algorithm="${item.digestAlgorithm.getAlgorithmName()}" />` +
+          `<${prefix}DigestValue>${digest}</${prefix}DigestValue>` +
+          `</${prefix}Reference>`;
+
+        completed++;
+        if (completed === workItems.length) {
+          callback(null, results.join(""));
+        }
+      });
+    });
   }
 
   getCanonXml(

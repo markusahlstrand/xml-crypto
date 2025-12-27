@@ -185,26 +185,84 @@ To migrate from Node.js crypto to WebCrypto:
      WebCryptoRsaSha256;
    ```
 
+## X.509 Certificate Support
+
+The Web Crypto API doesn't directly support X.509 certificates. To use certificates with WebCrypto, you have two options:
+
+### Option 1: Use a Pluggable Certificate Parser (Recommended)
+
+You can configure a certificate parser that extracts the public key from X.509 certificates. This keeps the core library lightweight while allowing you to bring your own ASN.1 parser.
+
+```javascript
+import { setCertificateParser } from "xml-crypto";
+import * as x509 from "@peculiar/x509";
+
+// Configure the certificate parser once at startup
+setCertificateParser({
+  extractPublicKey(certPem) {
+    const cert = new x509.X509Certificate(certPem);
+    return cert.publicKey.rawData;
+  },
+});
+
+// Now you can use X.509 certificates directly with WebCrypto
+const sig = new SignedXml();
+sig.publicCert = certificatePem; // Works with certificates!
+```
+
+Popular libraries for parsing X.509 certificates:
+
+- **[@peculiar/x509](https://www.npmjs.com/package/@peculiar/x509)** - Pure JavaScript/TypeScript, works in browsers and Node.js
+- **[pkijs](https://www.npmjs.com/package/pkijs)** - Full-featured PKI library
+- **[asn1js](https://www.npmjs.com/package/asn1js)** - Low-level ASN.1 parsing
+
+#### Example with pkijs
+
+```javascript
+import { setCertificateParser } from "xml-crypto";
+import * as pkijs from "pkijs";
+import * as asn1js from "asn1js";
+
+setCertificateParser({
+  extractPublicKey(certPem) {
+    // Remove PEM headers and decode base64
+    const pemContent = certPem
+      .replace(/-----BEGIN CERTIFICATE-----/, "")
+      .replace(/-----END CERTIFICATE-----/, "")
+      .replace(/\s/g, "");
+    const der = Uint8Array.from(atob(pemContent), (c) => c.charCodeAt(0));
+
+    // Parse the certificate
+    const asn1 = asn1js.fromBER(der.buffer);
+    const cert = new pkijs.Certificate({ schema: asn1.result });
+
+    // Return the SubjectPublicKeyInfo as ArrayBuffer
+    return cert.subjectPublicKeyInfo.toSchema().toBER(false);
+  },
+});
+```
+
+### Option 2: Extract the Public Key Manually
+
+If you prefer not to add a runtime dependency, you can extract the public key at build time or on the server:
+
+```javascript
+// In Node.js, extract the public key like this:
+import { createPublicKey } from "crypto";
+
+const publicKey = createPublicKey(certificatePem);
+const spkiPublicKey = publicKey.export({
+  type: "spki",
+  format: "pem",
+});
+
+// Use spkiPublicKey with WebCrypto algorithms
+sig.publicCert = spkiPublicKey;
+```
+
 ## Limitations
 
-1. **X.509 Certificates**: The Web Crypto API doesn't directly support X.509 certificates. If you have a certificate, you need to extract the public key in SPKI format first:
-
-   ```javascript
-   // In Node.js, you can extract it like this:
-   import { createPublicKey } from "crypto";
-
-   const publicKey = createPublicKey(certificatePem);
-   const spkiPublicKey = publicKey.export({
-     type: "spki",
-     format: "pem",
-   });
-
-   // Use spkiPublicKey with WebCrypto algorithms
-   sig.publicCert = spkiPublicKey;
-   ```
-
-   In browsers, you'll need to prepare the keys in SPKI format beforehand or use a library to parse X.509 certificates.
-
+1. **X.509 Certificates**: Require a certificate parser (see above) or manual public key extraction.
 2. **PEM/DER parsing**: The utility functions provide basic PEM parsing.
 3. **Key formats**: Only PKCS8 private keys and SPKI public keys are currently supported for RSA.
 4. **Callback requirement**: All WebCrypto operations require callbacks - you cannot use them with the synchronous API (without a callback).

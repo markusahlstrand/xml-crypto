@@ -1,4 +1,5 @@
 import type { ErrorFirstCallback, HashAlgorithm } from "./types";
+import { getSubtle, arrayBufferToBase64 } from "./webcrypto-utils";
 
 /**
  * WebCrypto-based SHA-1 hash algorithm
@@ -16,10 +17,10 @@ export class WebCryptoSha1 implements HashAlgorithm {
 
     const encoder = new TextEncoder();
     const data = encoder.encode(xml);
-    crypto.subtle
+    getSubtle()
       .digest("SHA-1", data)
       .then((hashBuffer) => {
-        const hash = this.arrayBufferToBase64(hashBuffer);
+        const hash = arrayBufferToBase64(hashBuffer);
         callback(null, hash);
       })
       .catch((err) => {
@@ -30,15 +31,6 @@ export class WebCryptoSha1 implements HashAlgorithm {
   getAlgorithmName = (): string => {
     return "http://www.w3.org/2000/09/xmldsig#sha1";
   };
-
-  private arrayBufferToBase64(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer);
-    let binary = "";
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-  }
 }
 
 /**
@@ -57,10 +49,10 @@ export class WebCryptoSha256 implements HashAlgorithm {
 
     const encoder = new TextEncoder();
     const data = encoder.encode(xml);
-    crypto.subtle
+    getSubtle()
       .digest("SHA-256", data)
       .then((hashBuffer) => {
-        const hash = this.arrayBufferToBase64(hashBuffer);
+        const hash = arrayBufferToBase64(hashBuffer);
         callback(null, hash);
       })
       .catch((err) => {
@@ -71,15 +63,6 @@ export class WebCryptoSha256 implements HashAlgorithm {
   getAlgorithmName = (): string => {
     return "http://www.w3.org/2001/04/xmlenc#sha256";
   };
-
-  private arrayBufferToBase64(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer);
-    let binary = "";
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-  }
 }
 
 /**
@@ -98,10 +81,10 @@ export class WebCryptoSha512 implements HashAlgorithm {
 
     const encoder = new TextEncoder();
     const data = encoder.encode(xml);
-    crypto.subtle
+    getSubtle()
       .digest("SHA-512", data)
       .then((hashBuffer) => {
-        const hash = this.arrayBufferToBase64(hashBuffer);
+        const hash = arrayBufferToBase64(hashBuffer);
         callback(null, hash);
       })
       .catch((err) => {
@@ -112,13 +95,4 @@ export class WebCryptoSha512 implements HashAlgorithm {
   getAlgorithmName = (): string => {
     return "http://www.w3.org/2001/04/xmlenc#sha512";
   };
-
-  private arrayBufferToBase64(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer);
-    let binary = "";
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-  }
 }
