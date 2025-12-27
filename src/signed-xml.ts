@@ -1307,9 +1307,7 @@ export class SignedXml {
       const nodes = xpath.selectWithResolver(ref.xpath ?? "", doc, this.namespaceResolver);
       if (!utils.isArrayHasLength(nodes)) {
         callback(
-          new Error(
-            `the following xpath cannot be signed because it was not found: ${ref.xpath}`,
-          ),
+          new Error(`the following xpath cannot be signed because it was not found: ${ref.xpath}`),
         );
         return;
       }

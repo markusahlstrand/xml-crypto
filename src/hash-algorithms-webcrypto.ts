@@ -1,8 +1,5 @@
 import type { ErrorFirstCallback, HashAlgorithm } from "./types";
-<<<<<<< HEAD
 import { getSubtle, arrayBufferToBase64 } from "./webcrypto-utils";
-=======
->>>>>>> master
 
 /**
  * WebCrypto-based SHA-1 hash algorithm
@@ -20,17 +17,10 @@ export class WebCryptoSha1 implements HashAlgorithm {
 
     const encoder = new TextEncoder();
     const data = encoder.encode(xml);
-<<<<<<< HEAD
     getSubtle()
       .digest("SHA-1", data)
       .then((hashBuffer) => {
         const hash = arrayBufferToBase64(hashBuffer);
-=======
-    crypto.subtle
-      .digest("SHA-1", data)
-      .then((hashBuffer) => {
-        const hash = this.arrayBufferToBase64(hashBuffer);
->>>>>>> master
         callback(null, hash);
       })
       .catch((err) => {
@@ -59,17 +49,10 @@ export class WebCryptoSha256 implements HashAlgorithm {
 
     const encoder = new TextEncoder();
     const data = encoder.encode(xml);
-<<<<<<< HEAD
     getSubtle()
       .digest("SHA-256", data)
       .then((hashBuffer) => {
         const hash = arrayBufferToBase64(hashBuffer);
-=======
-    crypto.subtle
-      .digest("SHA-256", data)
-      .then((hashBuffer) => {
-        const hash = this.arrayBufferToBase64(hashBuffer);
->>>>>>> master
         callback(null, hash);
       })
       .catch((err) => {
@@ -98,17 +81,10 @@ export class WebCryptoSha512 implements HashAlgorithm {
 
     const encoder = new TextEncoder();
     const data = encoder.encode(xml);
-<<<<<<< HEAD
     getSubtle()
       .digest("SHA-512", data)
       .then((hashBuffer) => {
         const hash = arrayBufferToBase64(hashBuffer);
-=======
-    crypto.subtle
-      .digest("SHA-512", data)
-      .then((hashBuffer) => {
-        const hash = this.arrayBufferToBase64(hashBuffer);
->>>>>>> master
         callback(null, hash);
       })
       .catch((err) => {
